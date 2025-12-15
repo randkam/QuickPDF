@@ -1,87 +1,141 @@
 import os
-from flask import Blueprint, request, render_template
+from flask import Blueprint, current_app, jsonify, request, send_from_directory, url_for
 from werkzeug.utils import secure_filename
 from .pdf_utils import swapPages, keepPages, removePages, mergePDFs
+from .config import Config
 
 main = Blueprint('main', __name__)
 
-UPLOAD_FOLDER = 'uploads/'
-ALLOWED_EXTENSIONS = {'pdf'}
 
-def allowed_file(filename):
-    return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
+def allowed_file(filename: str) -> bool:
+    allowed = current_app.config.get('ALLOWED_EXTENSIONS', Config.ALLOWED_EXTENSIONS)
+    return '.' in filename and filename.rsplit('.', 1)[1].lower() in allowed
 
-@main.route('/')
-def index():
-    return render_template('index.html')
+
+def _build_download_url(filename: str) -> str:
+    """Return an absolute download URL for the generated file."""
+    return url_for('main.download_file', filename=filename, _external=True)
+
+
+def _clean_pages(pages_raw: str | None) -> list[str]:
+    """Normalize page input into a clean list of positive integers as strings."""
+    if not pages_raw:
+        return []
+
+    pages = [page.strip() for page in pages_raw.split(',') if page.strip()]
+    if any(not page.isdigit() or int(page) < 1 for page in pages):
+        raise ValueError("Pages must be positive numbers (e.g. 1,2,3).")
+    return pages
+
+
+@main.route('/health')
+def health():
+    return jsonify({"status": "ok"})
+
 
 @main.route('/upload', methods=['POST'])
 def upload_file():
-    operation = request.form.get('operation')
-    pages = request.form.get('pages')
+    upload_dir = current_app.config['UPLOAD_FOLDER']
+    operation = (request.form.get('operation') or '').strip().lower()
+    pages_raw = request.form.get('pages')
 
-    # Handle merge operation separately
-    if operation == 'merge':
-        merge_files = request.files.getlist('file')
-        if not merge_files or all(f.filename == '' for f in merge_files):
-            return "No files selected for merge"
-        
-        saved_files = []
-        for f in merge_files:
-            if f and allowed_file(f.filename):
-                filename = secure_filename(f.filename)
-                filepath = os.path.join(UPLOAD_FOLDER, filename)
-                f.save(filepath)
-                saved_files.append(filepath)
-        
-        if not saved_files:
-            return "No valid files provided for merge"
+    if operation not in {'swap', 'merge', 'keep', 'remove'}:
+        return jsonify({"message": "Please choose a valid operation."}), 400
 
-        # Prepare arguments for merging
-        class Args:
-            def __init__(self, inputs, output):
-                self.inputs = inputs
-                self.output = output
+    try:
+        pages = _clean_pages(pages_raw)
+    except ValueError as exc:
+        return jsonify({"message": str(exc)}), 400
 
-        output_filepath = os.path.join(UPLOAD_FOLDER, 'output_merged.pdf')
-        args = Args(inputs=saved_files, output=output_filepath)
-        mergePDFs(args)
-        return f"PDFs merged. Output saved as {output_filepath}"
-    
-    # For non-merge operations, expect a single file upload
-    if 'file' not in request.files:
-        return "No file part"
-    
-    file = request.files['file']
-    if file.filename == '':
-        return "No selected file"
-    
-    if file and allowed_file(file.filename):
+    # Validate page requirements for non-merge operations
+    if operation != 'merge' and not pages:
+        return jsonify({"message": "Provide at least one page number for this operation."}), 400
+    if operation == 'swap' and len(pages) != 2:
+        return jsonify({"message": "Swap requires exactly two page numbers."}), 400
+
+    try:
+        if operation == 'merge':
+            merge_files = request.files.getlist('file')
+            if not merge_files or all(f.filename == '' for f in merge_files):
+                return jsonify({"message": "Please select PDF files to merge."}), 400
+
+            saved_files = []
+            for upload in merge_files:
+                if upload and allowed_file(upload.filename):
+                    filename = secure_filename(upload.filename)
+                    filepath = os.path.join(upload_dir, filename)
+                    upload.save(filepath)
+                    saved_files.append(filepath)
+
+            if not saved_files:
+                return jsonify({"message": "No valid PDF files found."}), 400
+
+            class Args:
+                def __init__(self, inputs, output):
+                    self.inputs = inputs
+                    self.output = output
+
+            output_name = 'output_merged.pdf'
+            output_filepath = os.path.join(upload_dir, output_name)
+            args = Args(inputs=saved_files, output=output_filepath)
+            mergePDFs(args)
+
+            return jsonify({
+                "message": "PDFs merged successfully.",
+                "download_url": _build_download_url(output_name),
+            })
+
+        # For non-merge operations we expect a single file
+        if 'file' not in request.files:
+            return jsonify({"message": "No file found in request."}), 400
+
+        file = request.files['file']
+        if file.filename == '':
+            return jsonify({"message": "No file selected."}), 400
+        if not (file and allowed_file(file.filename)):
+            return jsonify({"message": "Only PDF files are supported."}), 400
+
         filename = secure_filename(file.filename)
-        filepath = os.path.join(UPLOAD_FOLDER, filename)
-        file.save(filepath)
+        input_filepath = os.path.join(upload_dir, filename)
+        file.save(input_filepath)
 
-        # Prepare arguments for the PDF operations (pages expected to be comma-separated)
+        output_name = f'output_{filename}'
+        output_filepath = os.path.join(upload_dir, output_name)
+
         class Args:
             def __init__(self, input, output, pages):
                 self.input = input
                 self.output = output
                 self.pages = pages
 
-        output_filepath = os.path.join(UPLOAD_FOLDER, f'output_{filename}')
-        # For operations that use pages, split the pages string if provided
-        args = Args(input=filepath, output=output_filepath, pages=pages.split(',') if pages else [])
-        
+        args = Args(input=input_filepath, output=output_filepath, pages=pages)
+
         if operation == 'swap':
             swapPages(args)
-            return f"Pages swapped in {filename}. Output saved as {output_filepath}"
+            message = "Pages swapped successfully."
         elif operation == 'keep':
             keepPages(args)
-            return f"Pages kept from {filename}. Output saved as {output_filepath}"
+            message = "Selected pages kept successfully."
         elif operation == 'remove':
             removePages(args)
-            return f"Pages removed from {filename}. Output saved as {output_filepath}"
+            message = "Selected pages removed successfully."
         else:
-            return "Invalid operation"
+            return jsonify({"message": "Invalid operation."}), 400
 
-    return "Invalid file type"
+        return jsonify({
+            "message": message,
+            "download_url": _build_download_url(output_name),
+        })
+
+    except Exception as exc:  # noqa: BLE001 - surface unexpected failures to the user
+        current_app.logger.exception("PDF operation failed: %s", exc)
+        return jsonify({"message": "Something went wrong while processing the PDF."}), 500
+
+
+@main.route('/download/<path:filename>', methods=['GET'])
+def download_file(filename):
+    upload_dir = current_app.config['UPLOAD_FOLDER']
+    file_path = os.path.join(upload_dir, filename)
+    if not os.path.isfile(file_path):
+        return jsonify({"message": "File not found."}), 404
+    return send_from_directory(upload_dir, filename, as_attachment=True)

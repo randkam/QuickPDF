@@ -1,38 +1,643 @@
-.App {
+/* 
+  Sunny & Warm Color Palette
+  #4E598C - Dusk Blue (base)
+  #FFFFFF - White (text)
+  #F9C784 - Apricot Cream (light accent)
+  #FCAF58 - Sandy Brown (medium accent)
+  #FF8C42 - Pumpkin Spice (primary accent)
+*/
+
+:root {
+  --dusk-blue: #4E598C;
+  --white: #FFFFFF;
+  --apricot-cream: #F9C784;
+  --sandy-brown: #FCAF58;
+  --pumpkin-spice: #FF8C42;
+}
+
+@import url('https://fonts.googleapis.com/css2?family=Nunito:wght@400;500;600;700;800&display=swap');
+
+@keyframes sunshine {
+  0%, 100% {
+    box-shadow: 
+      0 4px 20px rgba(255, 140, 66, 0.4),
+      0 0 40px rgba(252, 175, 88, 0.2);
+  }
+  50% {
+    box-shadow: 
+      0 6px 28px rgba(255, 140, 66, 0.5),
+      0 0 50px rgba(252, 175, 88, 0.3);
+  }
+}
+
+@keyframes gentle-float {
+  0%, 100% {
+    transform: translateY(0px);
+  }
+  50% {
+    transform: translateY(-5px);
+  }
+}
+
+.app-shell {
+  min-height: 100vh;
+  background: 
+    radial-gradient(ellipse at 20% 0%, rgba(255, 140, 66, 0.15), transparent 50%),
+    radial-gradient(ellipse at 80% 10%, rgba(252, 175, 88, 0.12), transparent 45%),
+    radial-gradient(ellipse at 50% 100%, rgba(249, 199, 132, 0.1), transparent 50%),
+    linear-gradient(165deg, #4E598C 0%, #5A6699 25%, #4E598C 50%, #424D7A 75%, #4E598C 100%);
+  color: var(--white);
+  position: relative;
+  overflow-x: hidden;
+}
+
+.app-shell::before {
+  content: '';
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: 
+    radial-gradient(circle at 15% 85%, rgba(255, 140, 66, 0.06) 0%, transparent 40%),
+    radial-gradient(circle at 85% 15%, rgba(249, 199, 132, 0.06) 0%, transparent 40%);
+  pointer-events: none;
+  z-index: 0;
+}
+
+.app-bar {
+  background: rgba(66, 77, 122, 0.9) !important;
+  backdrop-filter: blur(16px) saturate(140%);
+  border-bottom: 1px solid rgba(255, 140, 66, 0.25) !important;
+  box-shadow: 
+    0 4px 20px rgba(0, 0, 0, 0.15),
+    0 0 0 1px rgba(255, 255, 255, 0.05) inset !important;
+  position: relative;
+  z-index: 10;
+}
+
+.hero {
+  background: rgba(66, 77, 122, 0.6);
+  border: 1px solid rgba(255, 140, 66, 0.3);
+  position: relative;
+  border-radius: 24px;
+  padding: 40px;
+  box-shadow: 
+    0 8px 32px rgba(0, 0, 0, 0.15),
+    inset 0 1px 0 rgba(255, 255, 255, 0.1);
+  transition: all 0.4s ease;
+  overflow: hidden;
+}
+
+.hero::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, var(--pumpkin-spice), var(--sandy-brown), var(--apricot-cream), transparent);
+}
+
+.hero > * {
+  position: relative;
+  z-index: 1;
+}
+
+.hero:hover {
+  transform: translateY(-4px);
+  border-color: rgba(255, 140, 66, 0.5);
+  box-shadow: 
+    0 16px 48px rgba(0, 0, 0, 0.2),
+    0 0 40px rgba(255, 140, 66, 0.1),
+    inset 0 1px 0 rgba(255, 255, 255, 0.15);
+}
+
+.panel {
+  border-radius: 20px;
+  background: rgba(66, 77, 122, 0.55);
+  border: 1px solid rgba(255, 140, 66, 0.2);
+  box-shadow: 
+    0 4px 24px rgba(0, 0, 0, 0.12),
+    inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  transition: all 0.4s ease;
+  position: relative;
+  overflow: hidden;
+}
+
+.panel::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, rgba(255, 140, 66, 0.5), transparent);
+}
+
+.panel:hover {
+  transform: translateY(-3px);
+  border-color: rgba(255, 140, 66, 0.4);
+  box-shadow: 
+    0 12px 36px rgba(0, 0, 0, 0.18),
+    inset 0 1px 0 rgba(255, 255, 255, 0.1);
+}
+
+.result-panel {
+  background: rgba(66, 77, 122, 0.55) !important;
+  color: var(--white);
+  border: 1px solid rgba(249, 199, 132, 0.25) !important;
+}
+
+.result-panel::before {
+  background: linear-gradient(90deg, transparent, rgba(249, 199, 132, 0.5), transparent) !important;
+}
+
+.result-panel:hover {
+  border-color: rgba(249, 199, 132, 0.45) !important;
+}
+
+/* Chips */
+.hero .MuiChip-root,
+.panel .MuiChip-root {
+  background: rgba(255, 140, 66, 0.2);
+  color: var(--white);
+  font-weight: 600;
+  border: 1.5px solid rgba(255, 140, 66, 0.5);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  transition: all 0.25s ease;
+}
+
+.hero .MuiChip-root:hover,
+.panel .MuiChip-root:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 14px rgba(255, 140, 66, 0.3);
+  border-color: var(--pumpkin-spice);
+}
+
+/* Typography */
+.MuiTypography-body1,
+.MuiTypography-body2,
+.MuiTypography-caption,
+.MuiInputBase-input,
+.MuiFormLabel-root {
+  color: var(--white);
+}
+
+/* Input fields */
+.MuiOutlinedInput-root {
+  background: rgba(66, 77, 122, 0.5) !important;
+  border-radius: 14px !important;
+  transition: all 0.3s ease;
+}
+
+.MuiOutlinedInput-root:hover {
+  background: rgba(66, 77, 122, 0.7) !important;
+}
+
+.MuiInputLabel-root {
+  color: var(--apricot-cream) !important;
+}
+
+.MuiInputLabel-root.Mui-focused {
+  color: var(--sandy-brown) !important;
+}
+
+.MuiOutlinedInput-notchedOutline {
+  border-color: rgba(255, 140, 66, 0.35) !important;
+  border-width: 2px !important;
+  transition: all 0.3s ease;
+}
+
+.MuiOutlinedInput-root:hover .MuiOutlinedInput-notchedOutline {
+  border-color: rgba(255, 140, 66, 0.55) !important;
+}
+
+.MuiOutlinedInput-root.Mui-focused .MuiOutlinedInput-notchedOutline {
+  border-color: var(--pumpkin-spice) !important;
+  box-shadow: 0 0 0 4px rgba(255, 140, 66, 0.15);
+}
+
+.MuiFormHelperText-root {
+  color: var(--apricot-cream) !important;
+}
+
+/* Primary Button */
+.MuiButton-contained {
+  text-transform: none;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  border-radius: 14px !important;
+  padding: 14px 28px !important;
+  background: linear-gradient(135deg, #FF8C42 0%, #FCAF58 50%, #FF8C42 100%) !important;
+  background-size: 200% 200% !important;
+  color: #3D4570 !important;
+  box-shadow: 
+    0 4px 18px rgba(255, 140, 66, 0.45),
+    inset 0 2px 0 rgba(255, 255, 255, 0.25) !important;
+  transition: all 0.3s ease;
+  position: relative;
+  overflow: hidden;
+}
+
+.MuiButton-contained::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(255, 255, 255, 0.35),
+    transparent
+  );
+  transition: left 0.5s ease;
+}
+
+.MuiButton-contained:hover {
+  transform: translateY(-3px);
+  background-position: 100% 0 !important;
+  box-shadow: 
+    0 8px 28px rgba(255, 140, 66, 0.55),
+    0 0 30px rgba(252, 175, 88, 0.25),
+    inset 0 2px 0 rgba(255, 255, 255, 0.35) !important;
+}
+
+.MuiButton-contained:hover::before {
+  left: 100%;
+}
+
+.MuiButton-contained:active {
+  transform: translateY(-1px);
+}
+
+/* Outlined Button */
+.MuiButton-outlined {
+  text-transform: none;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  border-radius: 14px !important;
+  padding: 14px 28px !important;
+  color: var(--white) !important;
+  border: 2px solid rgba(249, 199, 132, 0.5) !important;
+  background: rgba(249, 199, 132, 0.1) !important;
+  transition: all 0.3s ease;
+}
+
+.MuiButton-outlined:hover {
+  border-color: var(--apricot-cream) !important;
+  background: rgba(249, 199, 132, 0.2) !important;
+  transform: translateY(-3px);
+  box-shadow: 0 6px 20px rgba(249, 199, 132, 0.25);
+}
+
+/* Status pill */
+.status-pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 6px 14px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+
+.status-pill.success {
+  background: rgba(255, 140, 66, 0.2);
+  color: var(--apricot-cream);
+  border: 2px solid rgba(255, 140, 66, 0.5);
+  box-shadow: 0 2px 10px rgba(255, 140, 66, 0.2);
+}
+
+/* Select / Menu */
+.MuiSelect-select {
+  background: transparent !important;
+}
+
+.MuiPaper-root.MuiMenu-paper {
+  background: rgba(66, 77, 122, 0.98) !important;
+  backdrop-filter: blur(16px);
+  border: 2px solid rgba(255, 140, 66, 0.3) !important;
+  box-shadow: 
+    0 12px 40px rgba(0, 0, 0, 0.35),
+    0 0 0 1px rgba(255, 255, 255, 0.05) inset !important;
+  border-radius: 14px !important;
+}
+
+.MuiMenuItem-root {
+  color: var(--white) !important;
+  transition: all 0.2s ease;
+  border-radius: 10px;
+  margin: 4px 8px;
+  font-weight: 500;
+}
+
+.MuiMenuItem-root:hover {
+  background: rgba(255, 140, 66, 0.2) !important;
+}
+
+.MuiMenuItem-root.Mui-selected {
+  background: rgba(255, 140, 66, 0.3) !important;
+}
+
+.MuiMenuItem-root.Mui-selected:hover {
+  background: rgba(255, 140, 66, 0.4) !important;
+}
+
+.MuiDivider-root {
+  border-color: rgba(255, 140, 66, 0.2) !important;
+}
+
+/* Paper backgrounds */
+.MuiPaper-root {
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+/* Feature Chips */
+.feature-chip {
+  background: linear-gradient(135deg, rgba(255, 140, 66, 0.2), rgba(252, 175, 88, 0.2)) !important;
+  color: var(--white) !important;
+  border: 2px solid rgba(255, 140, 66, 0.5) !important;
+  font-weight: 700 !important;
+  padding: 22px 18px !important;
+  box-shadow: 0 3px 12px rgba(255, 140, 66, 0.2) !important;
+  transition: all 0.3s ease !important;
+}
+
+.feature-chip:hover {
+  transform: translateY(-4px) scale(1.03);
+  box-shadow: 
+    0 8px 24px rgba(255, 140, 66, 0.35),
+    0 0 20px rgba(252, 175, 88, 0.15) !important;
+  border-color: var(--pumpkin-spice) !important;
+  background: linear-gradient(135deg, rgba(255, 140, 66, 0.3), rgba(252, 175, 88, 0.3)) !important;
+}
+
+.feature-chip .MuiChip-icon {
+  color: var(--sandy-brown) !important;
+  font-size: 20px !important;
+}
+
+/* File Chips */
+.file-chip {
+  background: rgba(249, 199, 132, 0.15) !important;
+  color: var(--white) !important;
+  border: 2px solid rgba(249, 199, 132, 0.45) !important;
+  font-weight: 600 !important;
+  padding: 20px 14px !important;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1) !important;
+  transition: all 0.25s ease !important;
+}
+
+.file-chip:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 18px rgba(249, 199, 132, 0.25) !important;
+  border-color: var(--apricot-cream) !important;
+}
+
+.file-chip .MuiChip-icon {
+  color: var(--apricot-cream) !important;
+}
+
+.file-chip .MuiChip-deleteIcon {
+  color: var(--pumpkin-spice) !important;
+  transition: all 0.2s ease;
+}
+
+.file-chip .MuiChip-deleteIcon:hover {
+  color: #FF9F5A !important;
+  transform: scale(1.2);
+}
+
+/* Page Chips */
+.page-chip {
+  background: rgba(255, 140, 66, 0.15) !important;
+  color: var(--white) !important;
+  border: 2px solid rgba(255, 140, 66, 0.45) !important;
+  font-weight: 700 !important;
+  padding: 20px 14px !important;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1) !important;
+  transition: all 0.25s ease !important;
+}
+
+.page-chip:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 18px rgba(255, 140, 66, 0.25) !important;
+  border-color: var(--pumpkin-spice) !important;
+}
+
+.page-chip .MuiChip-deleteIcon {
+  color: var(--sandy-brown) !important;
+  transition: all 0.2s ease;
+}
+
+.page-chip .MuiChip-deleteIcon:hover {
+  color: var(--pumpkin-spice) !important;
+  transform: scale(1.2);
+}
+
+/* Upload Hint */
+.upload-hint {
+  padding: 28px;
+  background: rgba(66, 77, 122, 0.4);
+  border: 2px dashed rgba(255, 140, 66, 0.35);
+  border-radius: 16px;
+  text-align: center;
+  transition: all 0.3s ease;
+}
+
+.upload-hint:hover {
+  border-color: rgba(255, 140, 66, 0.55);
+  background: rgba(66, 77, 122, 0.5);
+}
+
+/* Empty State */
+.empty-state {
+  padding: 20px;
   text-align: center;
 }
 
-.App-logo {
-  height: 40vmin;
-  pointer-events: none;
-}
-
-@media (prefers-reduced-motion: no-preference) {
-  .App-logo {
-    animation: App-logo-spin infinite 20s linear;
-  }
-}
-
-.App-header {
-  background-color: #282c34;
-  min-height: 100vh;
+.empty-icon {
+  width: 90px;
+  height: 90px;
+  margin: 0 auto;
   display: flex;
-  flex-direction: column;
   align-items: center;
   justify-content: center;
-  font-size: calc(10px + 2vmin);
-  color: white;
+  background: radial-gradient(circle, rgba(255, 140, 66, 0.15) 0%, transparent 70%);
+  border-radius: 50%;
+  transition: all 0.5s ease;
+  animation: gentle-float 4s ease-in-out infinite;
 }
 
-.App-link {
-  color: #61dafb;
+/* Success Indicator */
+.success-indicator {
+  padding: 20px;
+  background: linear-gradient(135deg, rgba(255, 140, 66, 0.15), rgba(249, 199, 132, 0.1));
+  border: 2px solid rgba(255, 140, 66, 0.4);
+  border-radius: 16px;
+  box-shadow: 0 4px 16px rgba(255, 140, 66, 0.15);
+  animation: slideInUp 0.4s ease-out;
 }
 
-@keyframes App-logo-spin {
+@keyframes slideInUp {
   from {
-    transform: rotate(0deg);
+    opacity: 0;
+    transform: translateY(20px);
   }
   to {
-    transform: rotate(360deg);
+    opacity: 1;
+    transform: translateY(0);
   }
+}
+
+.result-content {
+  animation: fadeIn 0.5s ease-out;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+/* Download Button */
+.download-button {
+  background: linear-gradient(135deg, #FF8C42 0%, #FCAF58 50%, #FF8C42 100%) !important;
+  background-size: 200% 200% !important;
+  color: #3D4570 !important;
+  box-shadow: 
+    0 6px 24px rgba(255, 140, 66, 0.5),
+    inset 0 2px 0 rgba(255, 255, 255, 0.3) !important;
+  font-weight: 800 !important;
+  padding: 16px 32px !important;
+  transition: all 0.3s ease !important;
+  position: relative;
+  overflow: hidden;
+}
+
+.download-button::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(255, 255, 255, 0.4),
+    transparent
+  );
+  transition: left 0.5s ease;
+}
+
+.download-button:hover {
+  transform: translateY(-4px) scale(1.02);
+  background-position: 100% 0 !important;
+  box-shadow: 
+    0 10px 36px rgba(255, 140, 66, 0.6),
+    0 0 35px rgba(252, 175, 88, 0.25),
+    inset 0 2px 0 rgba(255, 255, 255, 0.4) !important;
+  animation: sunshine 2s ease-in-out infinite;
+}
+
+.download-button:hover::before {
+  left: 100%;
+}
+
+.download-button:active {
+  transform: translateY(-2px) scale(1.01);
+}
+
+/* Enhanced Typography */
+.MuiTypography-h3 {
+  background: linear-gradient(135deg, #FFFFFF 0%, #F9C784 40%, #FF8C42 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  filter: brightness(1.05);
+}
+
+/* Form Controls */
+.MuiFormControl-root {
+  transition: all 0.3s ease;
+  max-width: none !important;
+  width: 100% !important;
+}
+
+.MuiFormControl-root:focus-within {
+  transform: translateY(-2px);
+}
+
+.panel .MuiButton-root {
+  max-width: none !important;
+}
+
+.panel form > * {
+  width: 100%;
+}
+
+/* Operation Panel - Force full width */
+.operation-panel {
+  width: 100% !important;
+  min-width: 0 !important;
+}
+
+.operation-form {
+  width: 100% !important;
+  max-width: none !important;
+  /* Avoid forcing horizontal scroll on narrower layouts */
+  min-width: 0;
+}
+
+.operation-form .MuiBox-root {
+  width: 100% !important;
+  max-width: none !important;
+}
+
+.operation-form .MuiFormControl-root,
+.operation-form .MuiButton-root,
+.operation-form .upload-hint {
+  width: 100% !important;
+  max-width: none !important;
+}
+
+/* Loading State */
+.MuiButton-contained:disabled {
+  background: rgba(255, 140, 66, 0.35) !important;
+  color: rgba(255, 255, 255, 0.6) !important;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1) !important;
+}
+
+/* Scrollbar */
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+::-webkit-scrollbar-track {
+  background: rgba(66, 77, 122, 0.5);
+  border-radius: 5px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: linear-gradient(135deg, var(--pumpkin-spice), var(--sandy-brown));
+  border-radius: 5px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: linear-gradient(135deg, #FF9F5A, var(--apricot-cream));
+}
+
+::selection {
+  background: rgba(255, 140, 66, 0.5);
+  color: var(--white);
 }
