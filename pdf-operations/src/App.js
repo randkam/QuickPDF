@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Alert as MuiAlert,
   AppBar,
@@ -111,6 +111,49 @@ const normalizeDownloadUrl = (url) => {
   return `${api}${suffix}`;
 };
 
+const LoadingResult = ({ operationTitle, progress }) => {
+  return (
+    <Box className="loading-state">
+      <Typography variant="subtitle1" sx={{ fontWeight: 800, mb: 0.5 }}>
+        Running {operationTitle}
+      </Typography>
+      <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+        Please wait… your PDF is being processed.
+      </Typography>
+
+      <Box className="arrow-progress" aria-label="Processing">
+        <Box className="arrow-progress__track">
+          <Box className="arrow-progress__fill" />
+        </Box>
+        <Box className="arrow-progress__head" />
+      </Box>
+
+      <Box className="loading-cool-text" aria-hidden="true">
+        <span className="loading-cool-text__word">Processing</span>
+        <span className="loading-cool-text__dots">
+          <span>.</span>
+          <span>.</span>
+          <span>.</span>
+        </span>
+      </Box>
+
+      <Box className="loading-percent">
+        <Box className="loading-percent__row">
+          <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 700 }}>
+            Progress
+          </Typography>
+          <Typography variant="caption" sx={{ fontWeight: 900 }}>
+            {Math.max(0, Math.min(100, Math.round(progress)))}%
+          </Typography>
+        </Box>
+        <Box className="loading-percent__bar" role="progressbar" aria-valuenow={Math.round(progress)} aria-valuemin={0} aria-valuemax={100}>
+          <Box className="loading-percent__barFill" style={{ width: `${Math.max(0, Math.min(100, progress))}%` }} />
+        </Box>
+      </Box>
+    </Box>
+  );
+};
+
 const PdfOperations = () => {
   const [file, setFile] = useState(null);
   const [mergeFiles, setMergeFiles] = useState([]);
@@ -120,9 +163,30 @@ const PdfOperations = () => {
   const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' });
   const [result, setResult] = useState(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [progress, setProgress] = useState(0);
+  const submittingAtRef = useRef(0);
 
   const selectedOperation = useMemo(() => operationDetails[operation] ?? operationDetails.merge, [operation]);
   const mergeCount = mergeFiles.length;
+  const hasFilesSelected = operation === 'merge' ? mergeFiles.length > 0 : Boolean(file);
+
+  useEffect(() => {
+    if (!isSubmitting) return;
+
+    // Simulated progress: climbs quickly at first, then slows and caps at 95% until done.
+    setProgress(0);
+    const startedAt = Date.now();
+    submittingAtRef.current = startedAt;
+
+    const interval = setInterval(() => {
+      const t = (Date.now() - startedAt) / 1000;
+      // Ease-out curve towards 95
+      const next = 95 * (1 - Math.exp(-1.4 * t));
+      setProgress((prev) => Math.max(prev, Math.min(95, next)));
+    }, 120);
+
+    return () => clearInterval(interval);
+  }, [isSubmitting]);
 
   const handleFileChange = (event) => {
     setFile(event.target.files[0] || null);
@@ -217,7 +281,13 @@ const PdfOperations = () => {
         severity: 'error',
       });
     } finally {
-      setIsSubmitting(false);
+      // Ensure the loading state is visible (so users can actually see it)
+      // but don't slow down results too much.
+      setProgress(100);
+      const minMs = 500;
+      const elapsed = Date.now() - (submittingAtRef.current || Date.now());
+      const remaining = Math.max(0, minMs - elapsed);
+      window.setTimeout(() => setIsSubmitting(false), remaining);
     }
   };
 
@@ -255,7 +325,7 @@ const PdfOperations = () => {
         </Toolbar>
       </AppBar>
 
-      <Container maxWidth="xl" sx={{ py: 5, px: { xs: 2, md: 4 } }}>
+      <Container maxWidth="lg" sx={{ py: { xs: 3, md: 5 }, px: { xs: 2, md: 4 } }}>
         <Paper elevation={6} className="hero" sx={{ mb: 4 }}>
           <Stack spacing={2}>
             <Box>
@@ -266,7 +336,7 @@ const PdfOperations = () => {
                 Merge, swap, keep, or remove pages. Minimal inputs, instant download links, calm visuals.
               </Typography>
             </Box>
-            <Stack direction="row" spacing={1.5} sx={{ mt: 2, flexWrap: 'wrap', gap: 1.5 }}>
+            <Stack direction="row" spacing={1.25} sx={{ mt: 2, flexWrap: 'wrap', gap: 1.25 }}>
               <Chip icon={<CheckCircleIcon />} label="Merge PDFs" size="medium" className="feature-chip" />
               <Chip icon={<CheckCircleIcon />} label="Swap pages" size="medium" className="feature-chip" />
               <Chip icon={<CheckCircleIcon />} label="Remove pages" size="medium" className="feature-chip" />
@@ -290,11 +360,25 @@ const PdfOperations = () => {
               className="panel operation-panel"
               sx={{ display: 'flex', flexDirection: 'column', width: '100%', minWidth: 0 }}
             >
-              <Box component="form" onSubmit={handleSubmit} className="operation-form" sx={{ p: { xs: 3, md: 4 }, gap: 3, display: 'flex', flexDirection: 'column', width: '100%' }}>
-                <Box sx={{ width: '100%' }}>
-                  <Typography variant="subtitle1" sx={{ mb: 1.5, fontWeight: 700, fontSize: '1rem' }}>
-                    📋 Operation
-                  </Typography>
+              <Box
+                component="form"
+                onSubmit={handleSubmit}
+                className="operation-form"
+                sx={{
+                  p: { xs: 2.5, md: 3 },
+                  gap: 2,
+                  display: 'flex',
+                  flexDirection: 'column',
+                  width: '100%',
+                }}
+              >
+                <Box className="form-section">
+                  <Box className="form-section__header">
+                    <span className="form-step">1</span>
+                    <Typography variant="subtitle1" sx={{ fontWeight: 800, fontSize: '1rem' }}>
+                      Choose an operation
+                    </Typography>
+                  </Box>
                   <FormControl fullWidth sx={{ maxWidth: 'none' }}>
                     <InputLabel id="operation-label">Select</InputLabel>
                     <Select
@@ -314,12 +398,13 @@ const PdfOperations = () => {
                   </Typography>
                 </Box>
 
-                <Divider sx={{ my: 1 }} />
-
-                <Box sx={{ width: '100%' }}>
-                  <Typography variant="subtitle1" sx={{ mb: 1.5, fontWeight: 700, fontSize: '1rem' }}>
-                    📁 Files
-                  </Typography>
+                <Box className="form-section">
+                  <Box className="form-section__header">
+                    <span className="form-step">2</span>
+                    <Typography variant="subtitle1" sx={{ fontWeight: 800, fontSize: '1rem' }}>
+                      Upload PDF{operation === 'merge' ? 's' : ''}
+                    </Typography>
+                  </Box>
                   {operation === 'merge' ? (
                     <>
                       <input
@@ -402,10 +487,13 @@ const PdfOperations = () => {
                 </Box>
 
                 {operation !== 'merge' && (
-                  <Box sx={{ width: '100%' }}>
-                    <Typography variant="subtitle1" sx={{ mb: 1.5, fontWeight: 700, fontSize: '1rem' }}>
-                      📄 Pages
-                    </Typography>
+                  <Box className="form-section">
+                    <Box className="form-section__header">
+                      <span className="form-step form-step--muted">3</span>
+                      <Typography variant="subtitle1" sx={{ fontWeight: 800, fontSize: '1rem' }}>
+                        Pages (optional)
+                      </Typography>
+                    </Box>
                     <Grid container spacing={1} alignItems="center">
                       <Grid item xs={12} sm={8}>
                         <TextField
@@ -439,7 +527,27 @@ const PdfOperations = () => {
                   </Box>
                 )}
 
-                <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5} sx={{ mt: 1, width: '100%' }}>
+                <Divider sx={{ my: 0.5, opacity: 0.6 }} />
+
+                <Box className="form-actions">
+                  <Box className="form-summary">
+                    <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 700 }}>
+                      Ready:{' '}
+                      <span className={`summary-pill ${hasFilesSelected ? 'summary-pill--ok' : ''}`}>
+                        {hasFilesSelected ? 'files selected' : 'upload a PDF'}
+                      </span>
+                    </Typography>
+                    {operation !== 'merge' && (
+                      <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 700 }}>
+                        Pages:{' '}
+                        <span className="summary-pill">
+                          {selectedPages.length ? `${selectedPages.length} added` : 'none'}
+                        </span>
+                      </Typography>
+                    )}
+                  </Box>
+
+                  <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.25} sx={{ width: '100%' }}>
                   <Button
                     variant="contained"
                     type="submit"
@@ -458,17 +566,21 @@ const PdfOperations = () => {
                   >
                     Reset
                   </Button>
-                </Stack>
+                  </Stack>
+                </Box>
               </Box>
             </Paper>
           </Box>
 
           <Box sx={{ flex: { xs: '1 1 auto', sm: '1 1 0' }, minWidth: 0 }}>
-            <Paper elevation={4} className="panel result-panel">
-              <Stack spacing={2.5} sx={{ p: 3.5 }}>
+            <Paper
+              elevation={4}
+              className={`panel result-panel${isSubmitting ? ' result-panel--loading' : ''}${!isSubmitting && result ? ' result-panel--ready' : ''}`}
+            >
+              <Stack spacing={2.25} sx={{ p: { xs: 2.5, md: 3 } }}>
                 <Box>
                   <Typography variant="h6" sx={{ fontWeight: 700, fontSize: '1.25rem', mb: 0.5 }}>
-                    ✨ Result
+                    Result
                   </Typography>
                   <Typography variant="body2" color="text.secondary">
                     Download link appears here after each run.
@@ -477,7 +589,9 @@ const PdfOperations = () => {
 
                 <Divider />
 
-                {result ? (
+                {isSubmitting ? (
+                  <LoadingResult operationTitle={selectedOperation.title} progress={progress} />
+                ) : result ? (
                   <Stack spacing={2} className="result-content">
                     <Box className="success-indicator">
                       <Stack direction="row" alignItems="center" spacing={1.5}>
