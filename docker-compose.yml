@@ -1,0 +1,50 @@
+services:
+  redis:
+    image: redis:7-alpine
+
+  backend:
+    build:
+      context: ./backend
+    environment:
+      - SECRET_KEY=${SECRET_KEY:-supersecretkey}
+      - UPLOAD_FOLDER=/data/uploads
+      - WORKER_URL=http://worker:8001
+      - MAX_CONTENT_LENGTH=${MAX_CONTENT_LENGTH:-52428800}
+      - JOBS_DIR=/data/jobs
+      - REDIS_URL=redis://redis:6379/0
+      - RQ_QUEUE_NAME=pdf
+      - RQ_JOB_TIMEOUT_S=${RQ_JOB_TIMEOUT_S:-180}
+    volumes:
+      - ./data/uploads:/data/uploads
+      - ./data/jobs:/data/jobs
+    depends_on:
+      - worker
+      - redis
+
+  worker:
+    build:
+      context: ./worker
+    environment:
+      - UPLOAD_FOLDER=/data/uploads
+      - JOBS_DIR=/data/jobs
+      - REDIS_URL=redis://redis:6379/0
+      - RQ_QUEUE_NAME=pdf
+      - CLEANUP_INPUTS=${CLEANUP_INPUTS:-1}
+    volumes:
+      - ./data/uploads:/data/uploads
+      - ./data/jobs:/data/jobs
+    depends_on:
+      - redis
+
+  nginx:
+    build:
+      context: .
+      dockerfile: nginx/Dockerfile
+      args:
+        - REACT_APP_API_URL=/api
+    ports:
+      - "${PORT:-8080}:80"
+    depends_on:
+      - backend
+
+

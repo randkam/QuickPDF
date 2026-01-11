@@ -1,0 +1,10 @@
+{
+  "short_name": "QuickPDF",
+  "name": "QuickPDF",
+  "start_url": ".",
+  "display": "standalone",
+  "theme_color": "#4E598C",
+  "background_color": "#4E598C"
+}
+
+
