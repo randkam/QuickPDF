@@ -4,6 +4,9 @@ from pathlib import Path
 
 class Config:
     SECRET_KEY = os.environ.get("SECRET_KEY", "supersecretkey")
+    # Comma-separated list of allowed origins (recommended for prod),
+    # e.g. "https://quick-pdf.netlify.app,https://quickpdfapi.top"
+    CORS_ORIGINS = os.environ.get("CORS_ORIGINS", "")
 
     # Where uploaded + processed files are stored.
     # In Docker we set this to /data/uploads (shared volume between backend+worker).

@@ -11,7 +11,16 @@ from .config import Config
 def create_app() -> Flask:
     app = Flask(__name__)
     app.config.from_object(Config)
-    CORS(app)  # Allow frontend requests (dev + nginx)
+    # CORS
+    # - If CORS_ORIGINS is unset/empty, allow all origins (convenient for dev).
+    # - If set, treat as comma-separated list of allowed origins (recommended for prod),
+    #   e.g. "https://your-site.netlify.app,https://your-custom-domain.com"
+    cors_origins_raw = (app.config.get("CORS_ORIGINS") or "").strip()
+    if cors_origins_raw:
+        origins = [o.strip() for o in cors_origins_raw.split(",") if o.strip()]
+        CORS(app, resources={r"/api/*": {"origins": origins}})
+    else:
+        CORS(app)  # Allow all (dev)
 
     # Respect X-Forwarded-* headers from nginx so request.remote_addr is meaningful.
     # docker-compose/nginx sets X-Forwarded-For and X-Forwarded-Proto.

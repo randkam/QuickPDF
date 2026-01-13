@@ -13,6 +13,7 @@ services:
       - REDIS_URL=redis://redis:6379/0
       - RQ_QUEUE_NAME=pdf
       - RQ_JOB_TIMEOUT_S=${RQ_JOB_TIMEOUT_S:-180}
+      - CORS_ORIGINS=${CORS_ORIGINS:-}
     volumes:
       - ./data/uploads:/data/uploads
       - ./data/jobs:/data/jobs
@@ -36,11 +37,7 @@ services:
       - redis
 
   nginx:
-    build:
-      context: .
-      dockerfile: nginx/Dockerfile
-      args:
-        - REACT_APP_API_URL=/api
+    image: nginx:1.27-alpine
     ports:
       - "80:80"
       - "443:443"
