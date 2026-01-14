@@ -9,8 +9,13 @@ import {
   createTheme,
   CssBaseline,
   Divider,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogTitle,
   FormControl,
   Grid,
+  IconButton,
   InputLabel,
   InputAdornment,
   MenuItem,
@@ -29,6 +34,8 @@ import DownloadIcon from '@mui/icons-material/FileDownload';
 import PictureAsPdfIcon from '@mui/icons-material/PictureAsPdf';
 import RestartAltIcon from '@mui/icons-material/RestartAlt';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
+import CloseIcon from '@mui/icons-material/Close';
+import FeedbackOutlinedIcon from '@mui/icons-material/FeedbackOutlined';
 import './App.css';
 
 // Sunny & Warm palette theme
@@ -82,6 +89,11 @@ const darkTheme = createTheme({
 // Local dev default (direct-to-backend); Docker/nginx sets REACT_APP_API_URL=/api at build time.
 const API_URL = process.env.REACT_APP_API_URL || 'http://127.0.0.1:5000/api';
 const API_ORIGIN = API_URL.replace(/\/api\/?$/, '');
+
+const encodeNetlifyForm = (data) =>
+  Object.keys(data)
+    .map((key) => `${encodeURIComponent(key)}=${encodeURIComponent(data[key] ?? '')}`)
+    .join('&');
 
 const Alert = React.forwardRef(function Alert(props, ref) {
   return <MuiAlert elevation={6} ref={ref} variant="filled" {...props} />;
@@ -169,6 +181,10 @@ const PdfOperations = () => {
   const [result, setResult] = useState(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [progress, setProgress] = useState(0);
+  const [isFeedbackOpen, setIsFeedbackOpen] = useState(false);
+  const [feedbackEmail, setFeedbackEmail] = useState('');
+  const [feedbackMessage, setFeedbackMessage] = useState('');
+  const [isSubmittingFeedback, setIsSubmittingFeedback] = useState(false);
   const submittingAtRef = useRef(0);
   const abortRef = useRef(null);
 
@@ -344,6 +360,41 @@ const PdfOperations = () => {
     setSnackbar((prev) => ({ ...prev, open: false }));
   };
 
+  const handleFeedbackSubmit = async (event) => {
+    event.preventDefault();
+    const message = feedbackMessage.trim();
+    if (!message) {
+      setSnackbar({ open: true, message: 'Please enter your feedback message.', severity: 'warning' });
+      return;
+    }
+
+    setIsSubmittingFeedback(true);
+    try {
+      const body = encodeNetlifyForm({
+        'form-name': 'feedback',
+        email: feedbackEmail.trim(),
+        message,
+      });
+
+      const res = await fetch('/', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body,
+      });
+
+      if (!res.ok) throw new Error('Unable to submit feedback right now.');
+
+      setFeedbackEmail('');
+      setFeedbackMessage('');
+      setIsFeedbackOpen(false);
+      setSnackbar({ open: true, message: 'Thanks! Feedback submitted.', severity: 'success' });
+    } catch (error) {
+      setSnackbar({ open: true, message: error.message || 'Unable to submit feedback.', severity: 'error' });
+    } finally {
+      setIsSubmittingFeedback(false);
+    }
+  };
+
   const pageHint = useMemo(() => {
     switch (operation) {
       // case 'swap':
@@ -367,9 +418,14 @@ const PdfOperations = () => {
             <Typography variant="h6" sx={{ flexGrow: 1, fontWeight: 700 }}>
               QuickPDF
             </Typography>
-            <Typography variant="body2" color="inherit">
-              Edit PDFs in seconds
-            </Typography>
+            <Button
+              color="inherit"
+              startIcon={<FeedbackOutlinedIcon />}
+              onClick={() => setIsFeedbackOpen(true)}
+              sx={{ mr: 1 }}
+            >
+              Feedback
+            </Button>
           </Toolbar>
         </AppBar>
 
@@ -707,6 +763,79 @@ const PdfOperations = () => {
             </Box>
           </Box>
         </Container>
+
+        <Dialog
+          open={isFeedbackOpen}
+          onClose={() => setIsFeedbackOpen(false)}
+          fullWidth
+          maxWidth="sm"
+          PaperProps={{
+            sx: {
+              backgroundColor: 'rgba(10, 12, 20, 0.96)',
+              border: '1px solid rgba(255, 255, 255, 0.14)',
+              boxShadow: '0 24px 70px rgba(0,0,0,0.55)',
+              backdropFilter: 'blur(10px)',
+            },
+          }}
+        >
+          <DialogTitle sx={{ pr: 6 }}>
+            Feedback
+            <IconButton
+              aria-label="Close feedback"
+              onClick={() => setIsFeedbackOpen(false)}
+              sx={{ position: 'absolute', right: 8, top: 8 }}
+            >
+              <CloseIcon />
+            </IconButton>
+          </DialogTitle>
+          <DialogContent dividers>
+            <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+              Have ideas or found a bug? Send it here.
+            </Typography>
+
+            <Box
+              component="form"
+              name="feedback"
+              data-netlify="true"
+              data-netlify-honeypot="bot-field"
+              onSubmit={handleFeedbackSubmit}
+            >
+              <input type="hidden" name="form-name" value="feedback" />
+              <input type="hidden" name="bot-field" />
+
+              <Stack spacing={1.25}>
+                <TextField
+                  fullWidth
+                  label="Email (optional)"
+                  value={feedbackEmail}
+                  onChange={(e) => setFeedbackEmail(e.target.value)}
+                  name="email"
+                />
+                <TextField
+                  fullWidth
+                  label="Your feedback"
+                  value={feedbackMessage}
+                  onChange={(e) => setFeedbackMessage(e.target.value)}
+                  name="message"
+                  multiline
+                  minRows={8}
+                  autoFocus
+                />
+              </Stack>
+            </Box>
+          </DialogContent>
+          <DialogActions sx={{ px: 3, py: 2 }}>
+            <Typography variant="caption" color="text.secondary" sx={{ flexGrow: 1 }}>
+              Powered by Netlify Forms
+            </Typography>
+            <Button onClick={() => setIsFeedbackOpen(false)} color="secondary">
+              Cancel
+            </Button>
+            <Button onClick={handleFeedbackSubmit} variant="contained" disabled={isSubmittingFeedback}>
+              {isSubmittingFeedback ? 'Sending…' : 'Send'}
+            </Button>
+          </DialogActions>
+        </Dialog>
 
         <Snackbar open={snackbar.open} autoHideDuration={5000} onClose={handleClose} anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}>
           <Alert onClose={handleClose} severity={snackbar.severity} sx={{ width: '100%' }}>
