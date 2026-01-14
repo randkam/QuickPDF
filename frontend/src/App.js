@@ -381,7 +381,7 @@ const PdfOperations = () => {
                   Edit PDFs without the clutter
                 </Typography>
                 <Typography variant="body1" color="text.secondary" sx={{ maxWidth: 640, fontSize: '1.1rem', lineHeight: 1.7 }}>
-                  Merge, swap, keep, or remove pages. Minimal inputs, instant download links, calm visuals.
+                  Merge, swap, keep, or remove pages. Minimal inputs, instant download links.
                 </Typography>
               </Box>
               <Stack direction="row" spacing={1.25} sx={{ mt: 2, flexWrap: 'wrap', gap: 1.25 }}>
