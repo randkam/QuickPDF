@@ -378,7 +378,8 @@ const PdfOperations = () => {
 
       const res = await fetch('/feedback', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        // Accept JSON to avoid any redirect-to-success-page behavior.
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded', Accept: 'application/json' },
         body,
       });
 
