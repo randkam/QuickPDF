@@ -191,6 +191,8 @@ const PdfOperations = () => {
   const [isSubmittingFeedback, setIsSubmittingFeedback] = useState(false);
   const submittingAtRef = useRef(0);
   const abortRef = useRef(null);
+  const fileInputRef = useRef(null);
+  const mergeFileInputRef = useRef(null);
 
   const selectedOperation = useMemo(() => operationDetails[operation] ?? operationDetails.merge, [operation]);
   const mergeCount = mergeFiles.length;
@@ -215,7 +217,10 @@ const PdfOperations = () => {
   }, [isSubmitting]);
 
   const handleFileChange = (event) => {
-    setFile(event.target.files[0] || null);
+    const next = event.target.files?.[0] || null;
+    setFile(next);
+    // Allow selecting the same file again after removing/resetting.
+    event.target.value = '';
   };
 
   const handleMergeFileChange = (event) => {
@@ -223,6 +228,8 @@ const PdfOperations = () => {
     if (newFiles.length) {
       setMergeFiles((prev) => [...prev, ...newFiles]);
     }
+    // Allow adding the same file again after removing/resetting.
+    event.target.value = '';
   };
 
   const handleOperationChange = (event) => {
@@ -233,6 +240,8 @@ const PdfOperations = () => {
     setSwapPages({ left: '', right: '' });
     setOutputName('');
     setResult(null);
+    if (fileInputRef.current) fileInputRef.current.value = '';
+    if (mergeFileInputRef.current) mergeFileInputRef.current.value = '';
   };
 
   const addPage = () => {
@@ -259,6 +268,11 @@ const PdfOperations = () => {
     setMergeFiles((prev) => prev.filter((f) => f !== fileToRemove));
   };
 
+  const removeSingleFile = () => {
+    setFile(null);
+    if (fileInputRef.current) fileInputRef.current.value = '';
+  };
+
   const resetAll = () => {
     if (abortRef.current) abortRef.current.abort();
     setFile(null);
@@ -268,6 +282,8 @@ const PdfOperations = () => {
     setSwapPages({ left: '', right: '' });
     setOutputName('');
     setResult(null);
+    if (fileInputRef.current) fileInputRef.current.value = '';
+    if (mergeFileInputRef.current) mergeFileInputRef.current.value = '';
   };
 
   const pollJobUntilDone = async (jobId, signal) => {
@@ -334,14 +350,11 @@ const PdfOperations = () => {
       const jobId = data.job_id;
       if (!jobId) throw new Error('Server returned no job_id.');
 
-      setSnackbar({ open: true, message: 'Job queued. Processing…', severity: 'info' });
-
       const job = await pollJobUntilDone(jobId, controller.signal);
       const downloadUrl = normalizeDownloadUrl(job.download_url || `/api/jobs/${jobId}/download`);
       const successMessage = 'Your PDF is ready.';
       const outputFileName = job.output_download_name || (outputName.trim() ? `${outputName.trim()}.pdf` : 'output.pdf');
       setResult({ message: successMessage, downloadUrl, outputFileName });
-      setSnackbar({ open: true, message: successMessage, severity: 'success' });
     } catch (error) {
       setSnackbar({
         open: true,
@@ -508,7 +521,15 @@ const PdfOperations = () => {
                     </Box>
                     {operation === 'merge' ? (
                       <>
-                        <input id="merge-file-upload" type="file" accept="application/pdf" multiple onChange={handleMergeFileChange} style={{ display: 'none' }} />
+                        <input
+                          id="merge-file-upload"
+                          ref={mergeFileInputRef}
+                          type="file"
+                          accept="application/pdf"
+                          multiple
+                          onChange={handleMergeFileChange}
+                          style={{ display: 'none' }}
+                        />
                         <label htmlFor="merge-file-upload">
                           <Button variant="contained" component="span" startIcon={<CloudUploadIcon />} fullWidth sx={{ mb: 1 }}>
                             Upload PDF(s)
@@ -543,14 +564,28 @@ const PdfOperations = () => {
                       </>
                     ) : (
                       <>
-                        <input id="file-upload" type="file" accept="application/pdf" onChange={handleFileChange} style={{ display: 'none' }} />
+                        <input
+                          id="file-upload"
+                          ref={fileInputRef}
+                          type="file"
+                          accept="application/pdf"
+                          onChange={handleFileChange}
+                          style={{ display: 'none' }}
+                        />
                         <label htmlFor="file-upload">
                           <Button variant="contained" component="span" startIcon={<CloudUploadIcon />} fullWidth sx={{ mb: 1 }}>
                             Upload PDF
                           </Button>
                         </label>
                         {file ? (
-                          <Chip icon={<PictureAsPdfIcon />} label={file.name} className="file-chip" />
+                          <Chip
+                            icon={<PictureAsPdfIcon />}
+                            label={file.name}
+                            onDelete={removeSingleFile}
+                            deleteIcon={<DeleteIcon />}
+                            className="file-chip"
+                            sx={{ maxWidth: '100%' }}
+                          />
                         ) : (
                           <Box className="upload-hint">
                             <Typography variant="body2" color="text.secondary">
