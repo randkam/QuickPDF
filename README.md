@@ -1,1 +1,1 @@
-Visit the Wep-app: https://quick-pdf.netlify.app
+https://quick-pdf.netlify.app
