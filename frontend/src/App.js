@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Alert as MuiAlert,
   AppBar,
+  Backdrop,
   Box,
   Button,
   Chip,
@@ -22,6 +23,7 @@ import {
   Paper,
   Select,
   Snackbar,
+  Slide,
   Stack,
   TextField,
   ThemeProvider,
@@ -98,6 +100,8 @@ const encodeNetlifyForm = (data) =>
 const Alert = React.forwardRef(function Alert(props, ref) {
   return <MuiAlert elevation={6} ref={ref} variant="filled" {...props} />;
 });
+
+const SnackbarTransition = (props) => <Slide {...props} direction="down" />;
 
 const operationDetails = {
   merge: {
@@ -372,6 +376,7 @@ const PdfOperations = () => {
     try {
       const body = encodeNetlifyForm({
         'form-name': 'feedback',
+        'bot-field': '',
         email: feedbackEmail.trim(),
         message,
       });
@@ -840,8 +845,66 @@ const PdfOperations = () => {
           </DialogActions>
         </Dialog>
 
-        <Snackbar open={snackbar.open} autoHideDuration={5000} onClose={handleClose} anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}>
-          <Alert onClose={handleClose} severity={snackbar.severity} sx={{ width: '100%' }}>
+        {/* Strong, attention-grabbing user messages */}
+        <Backdrop
+          open={snackbar.open}
+          onClick={handleClose}
+          sx={{
+            zIndex: 1390,
+            bgcolor: 'rgba(0,0,0,0.55)',
+            backdropFilter: 'blur(2px)',
+          }}
+        />
+        <Snackbar
+          open={snackbar.open}
+          autoHideDuration={6500}
+          onClose={handleClose}
+          anchorOrigin={{ vertical: 'top', horizontal: 'center' }}
+          TransitionComponent={SnackbarTransition}
+          sx={{
+            // Keep it below the AppBar and very visible.
+            mt: { xs: 7, sm: 9 },
+            '& .MuiSnackbarContent-root': { width: '100%' },
+            zIndex: 1400,
+          }}
+        >
+          <Alert
+            onClose={handleClose}
+            severity={snackbar.severity}
+            variant="filled"
+            sx={{
+              // Force solid, high-contrast backgrounds (some MUI variants can look translucent on dark themes).
+              backgroundColor:
+                snackbar.severity === 'success'
+                  ? '#1B5E20'
+                  : snackbar.severity === 'error'
+                    ? '#B71C1C'
+                    : snackbar.severity === 'warning'
+                      ? '#E65100'
+                      : '#0D47A1',
+              color: '#FFFFFF',
+              width: { xs: 'calc(100vw - 24px)', sm: 620 },
+              maxWidth: '100%',
+              fontSize: '1.05rem',
+              fontWeight: 900,
+              letterSpacing: '-0.01em',
+              border: '2px solid rgba(255,255,255,0.22)',
+              borderRadius: 2.5,
+              px: 2.25,
+              py: 1.75,
+              boxShadow: '0 22px 70px rgba(0,0,0,0.6)',
+            }}
+            action={
+              <Button
+                color="inherit"
+                size="small"
+                onClick={handleClose}
+                sx={{ fontWeight: 900, letterSpacing: '0.02em' }}
+              >
+                OK
+              </Button>
+            }
+          >
             {snackbar.message}
           </Alert>
         </Snackbar>
