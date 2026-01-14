@@ -376,7 +376,7 @@ const PdfOperations = () => {
         message,
       });
 
-      const res = await fetch('/', {
+      const res = await fetch('/feedback', {
         method: 'POST',
         headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
         body,
@@ -796,6 +796,8 @@ const PdfOperations = () => {
             <Box
               component="form"
               name="feedback"
+              method="POST"
+              action="/feedback"
               data-netlify="true"
               data-netlify-honeypot="bot-field"
               onSubmit={handleFeedbackSubmit}

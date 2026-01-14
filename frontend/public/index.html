@@ -15,7 +15,7 @@
       Netlify parses the built HTML at deploy time, so we include a hidden static form here.
       The visible form lives in React and posts to the same "feedback" form name.
     -->
-    <form name="feedback" data-netlify="true" data-netlify-honeypot="bot-field" hidden>
+    <form name="feedback" method="POST" action="/feedback" data-netlify="true" data-netlify-honeypot="bot-field" hidden>
       <input type="hidden" name="form-name" value="feedback" />
       <p>
         <label>
