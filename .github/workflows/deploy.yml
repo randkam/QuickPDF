@@ -104,12 +104,4 @@ jobs:
             fi
           ENDSSH
 
-      - name: Deployment Summary
-        run: |
-          echo "================================"
-          echo "✅ Deployment to EC2 completed!"
-          echo "================================"
-          echo "📍 Host: ${{ secrets.EC2_HOST }}"
-          echo "👤 User: ${{ secrets.EC2_USER }}"
-          echo "🕒 Time: $(date)"
-          echo "================================"
+
