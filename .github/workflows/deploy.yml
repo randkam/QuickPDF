@@ -1,0 +1,118 @@
+name: Deploy to AWS EC2
+
+on:
+  push:
+    branches:
+      - master  # Trigger on push to main or master branch
+  workflow_dispatch:  # Allow manual trigger from GitHub UI
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Configure SSH
+        env:
+          SSH_PRIVATE_KEY: ${{ secrets.EC2_SSH_PRIVATE_KEY }}
+          SSH_HOST: ${{ secrets.EC2_HOST }}
+          SSH_USER: ${{ secrets.EC2_USER }}
+        run: |
+          mkdir -p ~/.ssh
+          echo "$SSH_PRIVATE_KEY" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          ssh-keyscan -H $SSH_HOST >> ~/.ssh/known_hosts
+
+      - name: Deploy to EC2
+        env:
+          SSH_HOST: ${{ secrets.EC2_HOST }}
+          SSH_USER: ${{ secrets.EC2_USER }}
+          SECRET_KEY: ${{ secrets.SECRET_KEY }}
+          CORS_ORIGINS: ${{ secrets.CORS_ORIGINS }}
+        run: |
+          ssh -i ~/.ssh/deploy_key $SSH_USER@$SSH_HOST << 'ENDSSH'
+            set -e
+            
+            echo "🚀 Starting deployment..."
+            
+            # Find and navigate to app directory
+            if [ -d "$HOME/quickpdf" ]; then
+              cd "$HOME/quickpdf"
+            elif [ -d "/home/$USER/quickpdf" ]; then
+              cd "/home/$USER/quickpdf"
+            elif [ -d "$HOME/QuickPDF" ]; then
+              cd "$HOME/QuickPDF"
+            elif [ -d "/opt/quickpdf" ]; then
+              cd "/opt/quickpdf"
+            else
+              echo "❌ App directory not found. Searched:"
+              echo "  - $HOME/quickpdf"
+              echo "  - /home/$USER/quickpdf"
+              echo "  - $HOME/QuickPDF"
+              echo "  - /opt/quickpdf"
+              exit 1
+            fi
+            
+            echo "📁 Found app at: $(pwd)"
+            
+            echo "📦 Pulling latest changes from GitHub..."
+            git fetch origin
+            
+            # Pull from whichever branch exists (main or master)
+            if git show-ref --verify --quiet refs/remotes/origin/main; then
+              git reset --hard origin/main
+              echo "✓ Updated from main branch"
+            elif git show-ref --verify --quiet refs/remotes/origin/master; then
+              git reset --hard origin/master
+              echo "✓ Updated from master branch"
+            else
+              echo "⚠ Neither main nor master branch found, using current branch"
+              git reset --hard origin/$(git rev-parse --abbrev-ref HEAD)
+            fi
+            
+            echo "⚙️  Creating .env file with secrets..."
+            cat > .env << 'EOF'
+          SECRET_KEY=${{ secrets.SECRET_KEY }}
+          CORS_ORIGINS=${{ secrets.CORS_ORIGINS }}
+          MAX_CONTENT_LENGTH=52428800
+          RQ_JOB_TIMEOUT_S=180
+          CLEANUP_INPUTS=1
+          EOF
+            
+            echo "🛑 Stopping existing containers..."
+            docker compose -f docker-compose.prod.yml down
+            
+            echo "🔨 Rebuilding and starting containers..."
+            docker compose -f docker-compose.prod.yml up -d --build
+            
+            echo "🧹 Cleaning up old Docker images..."
+            docker image prune -f
+            
+            echo "📊 Container status:"
+            docker compose -f docker-compose.prod.yml ps
+            
+            echo "✅ Deployment complete!"
+          ENDSSH
+
+      - name: Verify Deployment
+        env:
+          SSH_HOST: ${{ secrets.EC2_HOST }}
+          SSH_USER: ${{ secrets.EC2_USER }}
+        run: |
+          echo "🏥 Running health check..."
+          ssh -i ~/.ssh/deploy_key $SSH_USER@$SSH_HOST << 'ENDSSH'
+            # Wait a few seconds for services to start
+            sleep 5
+            
+            # Check if backend is responding
+            if curl -f http://localhost/api/health > /dev/null 2>&1; then
+              echo "✅ Health check passed!"
+            else
+              echo "⚠️  Warning: Health check failed, but deployment completed. Check logs on EC2."
+              docker compose -f ~/quickpdf/docker-compose.prod.yml logs --tail=20
+            fi
+          ENDSSH
+
+
