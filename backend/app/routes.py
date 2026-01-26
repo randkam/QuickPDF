@@ -1,4 +1,5 @@
 import os
+import re
 import uuid
 from pathlib import Path
 
@@ -20,14 +21,57 @@ def allowed_file(filename: str) -> bool:
 
 
 def _clean_pages(pages_raw: str | None) -> list[str]:
-    """Normalize page input into a clean list of positive integers as strings."""
+    """
+    Normalize page input into a clean list of positive integers as strings.
+
+    Supports:
+    - Comma or whitespace separated values: "1,2,3" or "1 2 3"
+    - Ranges: "2-6" (inclusive)
+    - Mixed: "1,3,5-8"
+    """
     if not pages_raw:
         return []
 
-    pages = [page.strip() for page in pages_raw.split(",") if page.strip()]
-    if any(not page.isdigit() or int(page) < 1 for page in pages):
-        raise ValueError("Pages must be positive numbers (e.g. 1,2,3).")
-    return pages
+    raw = str(pages_raw).strip()
+    if not raw:
+        return []
+
+    tokens = [t for t in re.split(r"[,\s]+", raw) if t]
+    pages_out: list[str] = []
+    seen: set[str] = set()
+
+    def add_page(n: int) -> None:
+        if n < 1:
+            raise ValueError("Pages must be positive numbers.")
+        s = str(n)
+        if s not in seen:
+            pages_out.append(s)
+            seen.add(s)
+
+    for token in tokens:
+        token = token.strip()
+        if not token:
+            continue
+
+        if token.isdigit():
+            add_page(int(token))
+            continue
+
+        m = re.fullmatch(r"(\d+)-(\d+)", token)
+        if m:
+            start = int(m.group(1))
+            end = int(m.group(2))
+            if start < 1 or end < 1:
+                raise ValueError("Pages must be positive numbers.")
+            if end < start:
+                raise ValueError('Ranges must be ascending (e.g. "2-6").')
+            for n in range(start, end + 1):
+                add_page(n)
+            continue
+
+        raise ValueError('Pages must be numbers and ranges (e.g. "1,3,5-8").')
+
+    return pages_out
 
 
 def _make_output_name(prefix: str = "output", *, ext: str = "pdf") -> str:

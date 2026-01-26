@@ -106,7 +106,7 @@ const SnackbarTransition = (props) => <Slide {...props} direction="down" />;
 const operationDetails = {
   merge: {
     title: 'Merge PDFs',
-    helper: 'Combine multiple PDFs in the order you add them.',
+    helper: 'Combine 2 or more PDFs in the order you add them.',
   },
   swap: {
     title: 'Swap Pages',
@@ -114,11 +114,15 @@ const operationDetails = {
   },
   keep: {
     title: 'Keep Pages',
-    helper: 'Keep only the pages you list.',
+    helper: 'Extract specific pages from your PDF. All other pages will be discarded.',
+    placeholder: 'e.g., 1-5, 8, 10-12',
+    description: 'Enter the page numbers you want to KEEP in the final PDF',
   },
   remove: {
     title: 'Remove Pages',
-    helper: 'Delete unwanted pages and keep the rest.',
+    helper: 'Delete specific pages from your PDF. All other pages will be kept.',
+    placeholder: 'e.g., 2-4, 7, 9-11',
+    description: 'Enter the page numbers you want to DELETE from the PDF',
   },
 };
 
@@ -178,17 +182,26 @@ const PdfOperations = () => {
   const [mergeFiles, setMergeFiles] = useState([]);
   const [operation, setOperation] = useState('merge');
   const [pageInput, setPageInput] = useState('');
-  const [selectedPages, setSelectedPages] = useState([]);
+  const [selectedPages, setSelectedPages] = useState([]); // Array of { id, display, pages }
   const [swapPages, setSwapPages] = useState({ left: '', right: '' });
   const [outputName, setOutputName] = useState('');
   const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' });
   const [result, setResult] = useState(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [fieldErrors, setFieldErrors] = useState({
+    pageInput: '',
+    swapLeft: '',
+    swapRight: '',
+    file: '',
+    mergeFiles: '',
+    outputName: '',
+  });
   const [progress, setProgress] = useState(0);
   const [isFeedbackOpen, setIsFeedbackOpen] = useState(false);
   const [feedbackEmail, setFeedbackEmail] = useState('');
   const [feedbackMessage, setFeedbackMessage] = useState('');
   const [isSubmittingFeedback, setIsSubmittingFeedback] = useState(false);
+  const [feedbackError, setFeedbackError] = useState('');
   const submittingAtRef = useRef(0);
   const abortRef = useRef(null);
   const fileInputRef = useRef(null);
@@ -219,6 +232,9 @@ const PdfOperations = () => {
   const handleFileChange = (event) => {
     const next = event.target.files?.[0] || null;
     setFile(next);
+    if (next && fieldErrors.file) {
+      setFieldErrors((prev) => ({ ...prev, file: '' }));
+    }
     // Allow selecting the same file again after removing/resetting.
     event.target.value = '';
   };
@@ -227,6 +243,9 @@ const PdfOperations = () => {
     const newFiles = Array.from(event.target.files);
     if (newFiles.length) {
       setMergeFiles((prev) => [...prev, ...newFiles]);
+      if (fieldErrors.mergeFiles) {
+        setFieldErrors((prev) => ({ ...prev, mergeFiles: '' }));
+      }
     }
     // Allow adding the same file again after removing/resetting.
     event.target.value = '';
@@ -245,23 +264,121 @@ const PdfOperations = () => {
   };
 
   const addPage = () => {
-    const value = pageInput.trim();
-    if (!value) return;
-    const isValid = /^\d+$/.test(value) && Number(value) > 0;
-    if (isValid && !selectedPages.includes(value)) {
-      setSelectedPages((prev) => [...prev, value]);
-      setPageInput('');
-    } else {
-      setSnackbar({
-        open: true,
-        message: 'Use positive numbers (e.g. 1 2 3) and avoid duplicates.',
-        severity: 'warning',
-      });
+    const raw = pageInput.trim();
+    if (!raw) return;
+
+    // Clear any existing error
+    setFieldErrors((prev) => ({ ...prev, pageInput: '' }));
+
+    // Backend default: MAX_OPERATION_PAGES=50 (keep/remove). Prevent frustration by enforcing early.
+    const maxOperationPages = 50;
+
+    const normalized = raw.replace(/\s+/g, ',');
+    const tokens = normalized
+      .split(',')
+      .map((t) => t.trim())
+      .filter(Boolean);
+
+    const newPageGroups = []; // Array of { id, display, pages }
+    const allNewPages = new Set();
+
+    for (const token of tokens) {
+      if (/^\d+$/.test(token)) {
+        const n = Number(token);
+        if (!Number.isFinite(n) || n < 1) {
+          setFieldErrors((prev) => ({ ...prev, pageInput: 'Please use positive page numbers (1, 2, 3, etc.)' }));
+          return;
+        }
+        const s = String(n);
+        if (!allNewPages.has(s)) {
+          newPageGroups.push({
+            id: `${Date.now()}-${Math.random()}`,
+            display: s,
+            pages: [s],
+          });
+          allNewPages.add(s);
+        }
+        continue;
+      }
+
+      if (/^\d+-\d+$/.test(token)) {
+        const [startRaw, endRaw] = token.split('-');
+        const start = Number(startRaw);
+        const end = Number(endRaw);
+        if (!Number.isFinite(start) || !Number.isFinite(end) || start < 1 || end < 1) {
+          setFieldErrors((prev) => ({ ...prev, pageInput: 'Please use positive page numbers in your range (e.g., 2-6)' }));
+          return;
+        }
+        if (end < start) {
+          setFieldErrors((prev) => ({ ...prev, pageInput: 'Range should go from low to high (e.g., 2-6, not 6-2)' }));
+          return;
+        }
+        
+        const rangePages = [];
+        for (let i = start; i <= end; i += 1) {
+          const s = String(i);
+          if (!allNewPages.has(s)) {
+            rangePages.push(s);
+            allNewPages.add(s);
+          }
+        }
+        
+        if (rangePages.length > 0) {
+          newPageGroups.push({
+            id: `${Date.now()}-${Math.random()}`,
+            display: token, // Keep the range format like "1-5"
+            pages: rangePages,
+          });
+        }
+        continue;
+      }
+
+      setFieldErrors((prev) => ({ ...prev, pageInput: 'Try using page numbers or ranges like: 1-5 or 1,3,7-9' }));
+      return;
     }
+
+    if (newPageGroups.length === 0) {
+      setFieldErrors((prev) => ({ ...prev, pageInput: 'Nothing new to add!' }));
+      return;
+    }
+
+    // Check for duplicates with existing selections
+    const existingPages = new Set();
+    selectedPages.forEach((group) => {
+      group.pages.forEach((p) => existingPages.add(p));
+    });
+
+    const filteredGroups = newPageGroups.filter((group) => {
+      return group.pages.some((p) => !existingPages.has(p));
+    });
+
+    if (filteredGroups.length === 0) {
+      const isSinglePage = newPageGroups.length === 1 && newPageGroups[0].pages.length === 1;
+      const isRange = newPageGroups.length === 1 && newPageGroups[0].pages.length > 1;
+      
+      if (isSinglePage) {
+        setFieldErrors((prev) => ({ ...prev, pageInput: `Page ${newPageGroups[0].display} is already added` }));
+      } else if (isRange) {
+        setFieldErrors((prev) => ({ ...prev, pageInput: `Pages ${newPageGroups[0].display} are already added` }));
+      } else {
+        setFieldErrors((prev) => ({ ...prev, pageInput: 'These pages are already added' }));
+      }
+      return;
+    }
+
+    // Count total pages after adding
+    const totalPagesAfter = existingPages.size + allNewPages.size - [...existingPages].filter(p => allNewPages.has(p)).length;
+    if (totalPagesAfter > maxOperationPages) {
+      setFieldErrors((prev) => ({ ...prev, pageInput: `That's too many pages! Maximum is ${maxOperationPages}` }));
+      return;
+    }
+
+    setSelectedPages((prev) => [...prev, ...filteredGroups]);
+    setPageInput('');
   };
 
-  const removePage = (pageToRemove) => {
-    setSelectedPages((prev) => prev.filter((page) => page !== pageToRemove));
+  const removePage = (groupId) => {
+    setSelectedPages((prev) => prev.filter((group) => group.id !== groupId));
   };
 
   const removeMergeFile = (fileToRemove) => {
@@ -294,14 +411,72 @@ const PdfOperations = () => {
       if (!response.ok) {
         throw new Error(data.message || 'Unable to check job status.');
       }
-      if (data.status === 'done') return data;
-      if (data.status === 'error') throw new Error(data.error_message || 'PDF processing failed.');
+                      if (data.status === 'done') return data;
+      if (data.status === 'error') throw new Error(data.error_message || 'Something went wrong while processing your PDF.');
       await new Promise((resolve) => window.setTimeout(resolve, pollMs));
     }
   };
 
   const handleSubmit = async (event) => {
     event.preventDefault();
+    
+    // Clear all errors first
+    setFieldErrors({
+      pageInput: '',
+      swapLeft: '',
+      swapRight: '',
+      file: '',
+      mergeFiles: '',
+      outputName: '',
+    });
+    
+    // Validate before submitting
+    let hasErrors = false;
+
+    if (operation === 'merge') {
+      if (mergeFiles.length === 0) {
+        setFieldErrors((prev) => ({ ...prev, mergeFiles: 'Please select at least two PDFs to merge' }));
+        hasErrors = true;
+      } else if (mergeFiles.length === 1) {
+        setFieldErrors((prev) => ({ ...prev, mergeFiles: 'Please select at least one more PDF to merge' }));
+        hasErrors = true;
+      }
+    } else {
+      if (!file) {
+        setFieldErrors((prev) => ({ ...prev, file: 'Please select a PDF file first' }));
+        hasErrors = true;
+      }
+      
+      if (operation === 'swap') {
+        const left = swapPages.left.trim();
+        const right = swapPages.right.trim();
+        const isValid = (v) => /^\d+$/.test(v) && Number(v) > 0;
+        
+        if (!left) {
+          setFieldErrors((prev) => ({ ...prev, swapLeft: 'Please enter a page number' }));
+          hasErrors = true;
+        } else if (!isValid(left)) {
+          setFieldErrors((prev) => ({ ...prev, swapLeft: 'Must be a positive number' }));
+          hasErrors = true;
+        }
+        
+        if (!right) {
+          setFieldErrors((prev) => ({ ...prev, swapRight: 'Please enter a page number' }));
+          hasErrors = true;
+        } else if (!isValid(right)) {
+          setFieldErrors((prev) => ({ ...prev, swapRight: 'Must be a positive number' }));
+          hasErrors = true;
+        }
+        
+        if (left && right && left === right) {
+          setFieldErrors((prev) => ({ ...prev, swapRight: 'Must be different from Page A' }));
+          hasErrors = true;
+        }
+      }
+    }
+
+    if (hasErrors) return;
+
     setIsSubmitting(true);
     setResult(null);
     if (abortRef.current) abortRef.current.abort();
@@ -316,23 +491,17 @@ const PdfOperations = () => {
       }
 
       if (operation === 'merge') {
-        if (mergeFiles.length === 0) {
-          throw new Error('Select at least one PDF to merge.');
-        }
         mergeFiles.forEach((f) => formData.append('file', f));
       } else {
-        if (!file) throw new Error('Select a PDF file first.');
         formData.append('file', file);
         if (operation === 'swap') {
           const left = swapPages.left.trim();
           const right = swapPages.right.trim();
-          const isValid = (v) => /^\d+$/.test(v) && Number(v) > 0;
-          if (!left || !right) throw new Error('Swap needs two page numbers.');
-          if (!isValid(left) || !isValid(right)) throw new Error('Swap pages must be positive numbers.');
-          if (left === right) throw new Error('Swap pages must be two different page numbers.');
           formData.append('pages', `${left},${right}`);
         } else if (selectedPages.length > 0) {
-          formData.append('pages', selectedPages.join(','));
+          // Flatten all page groups into a single comma-separated list
+          const allPages = selectedPages.flatMap((group) => group.pages);
+          formData.append('pages', allPages.join(','));
         }
       }
 
@@ -344,11 +513,11 @@ const PdfOperations = () => {
 
       const data = await response.json().catch(() => ({}));
       if (!response.ok) {
-        throw new Error(data.message || 'Unable to process your PDF right now.');
+        throw new Error(data.message || 'Unable to process your PDF right now. Please try again.');
       }
 
       const jobId = data.job_id;
-      if (!jobId) throw new Error('Server returned no job_id.');
+      if (!jobId) throw new Error('Something went wrong. Please try again.');
 
       const job = await pollJobUntilDone(jobId, controller.signal);
       const downloadUrl = normalizeDownloadUrl(job.download_url || `/api/jobs/${jobId}/download`);
@@ -358,7 +527,7 @@ const PdfOperations = () => {
     } catch (error) {
       setSnackbar({
         open: true,
-        message: error.message || 'Something went wrong.',
+        message: error.message || 'Something went wrong. Please try again.',
         severity: 'error',
       });
     } finally {
@@ -381,11 +550,12 @@ const PdfOperations = () => {
     event.preventDefault();
     const message = feedbackMessage.trim();
     if (!message) {
-      setSnackbar({ open: true, message: 'Please enter your feedback message.', severity: 'warning' });
+      setFeedbackError('Please write your feedback before submitting');
       return;
     }
 
     setIsSubmittingFeedback(true);
+    setFeedbackError('');
     try {
       const body = encodeNetlifyForm({
         'form-name': 'feedback',
@@ -401,31 +571,20 @@ const PdfOperations = () => {
         body,
       });
 
-      if (!res.ok) throw new Error('Unable to submit feedback right now.');
+      if (!res.ok) throw new Error('Unable to submit feedback right now. Please try again.');
 
       setFeedbackEmail('');
       setFeedbackMessage('');
+      setFeedbackError('');
       setIsFeedbackOpen(false);
-      setSnackbar({ open: true, message: 'Thanks! Feedback submitted.', severity: 'success' });
+      setSnackbar({ open: true, message: 'Thanks for your feedback!', severity: 'success' });
     } catch (error) {
-      setSnackbar({ open: true, message: error.message || 'Unable to submit feedback.', severity: 'error' });
+      setSnackbar({ open: true, message: error.message || 'Unable to submit feedback. Please try again.', severity: 'error' });
     } finally {
       setIsSubmittingFeedback(false);
     }
   };
 
-  const pageHint = useMemo(() => {
-    switch (operation) {
-      // case 'swap':
-      //   return 'Example: swap page 2 with page 4.';
-      // case 'keep':
-      //   return 'Example: add 1 then 2 then 5 to keep only those pages.';
-      // case 'remove':
-      //   return 'Example: add 3 then 7 to remove those pages.';
-      default:
-        return '';
-    }
-  }, [operation]);
 
   return (
     <ThemeProvider theme={darkTheme}>
@@ -521,77 +680,107 @@ const PdfOperations = () => {
                     </Box>
                     {operation === 'merge' ? (
                       <>
-                        <input
-                          id="merge-file-upload"
-                          ref={mergeFileInputRef}
-                          type="file"
-                          accept="application/pdf"
-                          multiple
-                          onChange={handleMergeFileChange}
-                          style={{ display: 'none' }}
-                        />
-                        <label htmlFor="merge-file-upload">
-                          <Button variant="contained" component="span" startIcon={<CloudUploadIcon />} fullWidth sx={{ mb: 1 }}>
-                            Upload PDF(s)
-                          </Button>
-                        </label>
-                        {mergeFiles.length > 0 ? (
-                          <>
-                            <Stack direction="row" spacing={1} flexWrap="wrap" sx={{ gap: 1, mb: 1.5 }}>
-                              {mergeFiles.map((selectedFile, index) => (
-                                <Chip
-                                  key={`${selectedFile.name}-${index}`}
-                                  icon={<PictureAsPdfIcon />}
-                                  label={selectedFile.name}
-                                  onDelete={() => removeMergeFile(selectedFile)}
-                                  deleteIcon={<DeleteIcon />}
-                                  className="file-chip"
-                                  sx={{ maxWidth: '100%' }}
-                                />
-                              ))}
-                            </Stack>
-                            <Typography variant="caption" sx={{ color: 'success.light', fontWeight: 600 }}>
-                              ✓ {mergeCount} file{mergeCount === 1 ? '' : 's'} selected
-                            </Typography>
-                          </>
-                        ) : (
-                          <Box className="upload-hint">
-                            <Typography variant="body2" color="text.secondary">
-                              Add PDFs in the order you want them merged.
-                            </Typography>
-                          </Box>
+                        <Box
+                          sx={{
+                            border: fieldErrors.mergeFiles ? '2px solid #ff4444' : '2px solid transparent',
+                            borderRadius: 2,
+                            p: fieldErrors.mergeFiles ? 1.5 : 0,
+                            transition: 'all 0.3s ease',
+                            animation: fieldErrors.mergeFiles ? 'error-pulse 0.4s ease-out' : 'none',
+                          }}
+                        >
+                          <input
+                            id="merge-file-upload"
+                            ref={mergeFileInputRef}
+                            type="file"
+                            accept="application/pdf"
+                            multiple
+                            onChange={handleMergeFileChange}
+                            style={{ display: 'none' }}
+                          />
+                          <label htmlFor="merge-file-upload">
+                            <Button variant="contained" component="span" startIcon={<CloudUploadIcon />} fullWidth sx={{ mb: 1 }}>
+                              Upload PDF(s)
+                            </Button>
+                          </label>
+                          {mergeFiles.length > 0 ? (
+                            <>
+                              <Stack direction="row" spacing={1} flexWrap="wrap" sx={{ gap: 1, mb: 1.5 }}>
+                                {mergeFiles.map((selectedFile, index) => (
+                                  <Chip
+                                    key={`${selectedFile.name}-${index}`}
+                                    icon={<PictureAsPdfIcon />}
+                                    label={selectedFile.name}
+                                    onDelete={() => removeMergeFile(selectedFile)}
+                                    deleteIcon={<DeleteIcon />}
+                                    className="file-chip"
+                                    sx={{ maxWidth: '100%' }}
+                                  />
+                                ))}
+                              </Stack>
+                              <Typography variant="caption" sx={{ color: 'success.light', fontWeight: 600 }}>
+                                ✓ {mergeCount} file{mergeCount === 1 ? '' : 's'} selected
+                              </Typography>
+                            </>
+                          ) : (
+                            <Box className="upload-hint">
+                              <Typography variant="body2" color="text.secondary">
+                                Add at least 2 PDFs in the order you want them merged.
+                              </Typography>
+                            </Box>
+                          )}
+                        </Box>
+                        {fieldErrors.mergeFiles && (
+                          <Typography variant="caption" sx={{ color: 'error.main', fontWeight: 600, mt: 1, display: 'block' }}>
+                            {fieldErrors.mergeFiles}
+                          </Typography>
                         )}
                       </>
                     ) : (
                       <>
-                        <input
-                          id="file-upload"
-                          ref={fileInputRef}
-                          type="file"
-                          accept="application/pdf"
-                          onChange={handleFileChange}
-                          style={{ display: 'none' }}
-                        />
-                        <label htmlFor="file-upload">
-                          <Button variant="contained" component="span" startIcon={<CloudUploadIcon />} fullWidth sx={{ mb: 1 }}>
-                            Upload PDF
-                          </Button>
-                        </label>
-                        {file ? (
-                          <Chip
-                            icon={<PictureAsPdfIcon />}
-                            label={file.name}
-                            onDelete={removeSingleFile}
-                            deleteIcon={<DeleteIcon />}
-                            className="file-chip"
-                            sx={{ maxWidth: '100%' }}
+                        <Box
+                          sx={{
+                            border: fieldErrors.file ? '2px solid #ff4444' : '2px solid transparent',
+                            borderRadius: 2,
+                            p: fieldErrors.file ? 1.5 : 0,
+                            transition: 'all 0.3s ease',
+                            animation: fieldErrors.file ? 'error-pulse 0.4s ease-out' : 'none',
+                          }}
+                        >
+                          <input
+                            id="file-upload"
+                            ref={fileInputRef}
+                            type="file"
+                            accept="application/pdf"
+                            onChange={handleFileChange}
+                            style={{ display: 'none' }}
                           />
-                        ) : (
-                          <Box className="upload-hint">
-                            <Typography variant="body2" color="text.secondary">
-                              Select a single PDF to modify.
-                            </Typography>
-                          </Box>
+                          <label htmlFor="file-upload">
+                            <Button variant="contained" component="span" startIcon={<CloudUploadIcon />} fullWidth sx={{ mb: 1 }}>
+                              Upload PDF
+                            </Button>
+                          </label>
+                          {file ? (
+                            <Chip
+                              icon={<PictureAsPdfIcon />}
+                              label={file.name}
+                              onDelete={removeSingleFile}
+                              deleteIcon={<DeleteIcon />}
+                              className="file-chip"
+                              sx={{ maxWidth: '100%' }}
+                            />
+                          ) : (
+                            <Box className="upload-hint">
+                              <Typography variant="body2" color="text.secondary">
+                                Select a single PDF to modify.
+                              </Typography>
+                            </Box>
+                          )}
+                        </Box>
+                        {fieldErrors.file && (
+                          <Typography variant="caption" sx={{ color: 'error.main', fontWeight: 600, mt: 1, display: 'block' }}>
+                            {fieldErrors.file}
+                          </Typography>
                         )}
                       </>
                     )}
@@ -602,32 +791,74 @@ const PdfOperations = () => {
                       <Box className="form-section__header">
                         <span className="form-step form-step--muted">3</span>
                         <Typography variant="subtitle1" sx={{ fontWeight: 800, fontSize: '1rem' }}>
-                          Pages
+                          {operation === 'keep' ? 'Pages to Keep' : 'Pages to Remove'}
                         </Typography>
                       </Box>
-                      <Grid container spacing={1} alignItems="center">
+                      
+                      {/* Operation Description */}
+                      <Box sx={{ mb: 2, p: 1.5, borderRadius: 2, bgcolor: 'rgba(255, 140, 66, 0.08)', border: '1px solid rgba(255, 140, 66, 0.2)' }}>
+                        <Typography variant="body2" sx={{ fontWeight: 600, color: '#FCAF58' }}>
+                          {selectedOperation.description}
+                        </Typography>
+                      </Box>
+
+                      <Grid container spacing={1} alignItems="flex-start">
                         <Grid item xs={12} sm={8}>
                           <TextField
                             fullWidth
-                            label="Add page number"
+                            label={operation === 'keep' ? 'Enter pages to keep' : 'Enter pages to remove'}
+                            placeholder={selectedOperation.placeholder}
                             value={pageInput}
-                            onChange={(e) => setPageInput(e.target.value)}
+                            onChange={(e) => {
+                              setPageInput(e.target.value);
+                              if (fieldErrors.pageInput) {
+                                setFieldErrors((prev) => ({ ...prev, pageInput: '' }));
+                              }
+                            }}
                             onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), addPage())}
-                            helperText={pageHint || 'Press Enter to add'}
+                            error={Boolean(fieldErrors.pageInput)}
+                            helperText={
+                              fieldErrors.pageInput || (
+                                <>
+                                  <strong>Format:</strong> Individual pages (1, 3, 5) or ranges (1-5, 10-15)
+                                  <br />
+                                  Press Enter or click Add to confirm
+                                </>
+                              )
+                            }
+                            FormHelperTextProps={{
+                              component: 'div',
+                              sx: { mt: 1 }
+                            }}
                           />
                         </Grid>
                         <Grid item xs={12} sm={4}>
-                          <Button fullWidth variant="outlined" onClick={addPage}>
-                            Add page
+                          <Button fullWidth variant="outlined" onClick={addPage} sx={{ height: '56px' }}>
+                            Add
                           </Button>
                         </Grid>
                       </Grid>
+
                       {selectedPages.length > 0 && (
-                        <Stack direction="row" spacing={1} flexWrap="wrap" sx={{ mt: 1.5, gap: 1 }}>
-                          {selectedPages.map((page, index) => (
-                            <Chip key={`${page}-${index}`} label={`Page ${page}`} onDelete={() => removePage(page)} deleteIcon={<DeleteIcon />} className="page-chip" />
-                          ))}
-                        </Stack>
+                        <Box sx={{ mt: 2 }}>
+                          <Typography variant="caption" sx={{ fontWeight: 700, color: 'success.light', mb: 1, display: 'block' }}>
+                            {operation === 'keep' 
+                              ? `✓ Selected ${selectedPages.length} item${selectedPages.length === 1 ? '' : 's'}` 
+                              : `✓ Selected ${selectedPages.length} item${selectedPages.length === 1 ? '' : 's'}`
+                            }
+                          </Typography>
+                          <Stack direction="row" spacing={1} flexWrap="wrap" sx={{ gap: 1 }}>
+                            {selectedPages.map((group) => (
+                              <Chip 
+                                key={group.id} 
+                                label={group.display.includes('-') ? `Pages ${group.display}` : `Page ${group.display}`} 
+                                onDelete={() => removePage(group.id)} 
+                                deleteIcon={<DeleteIcon />} 
+                                className="page-chip" 
+                              />
+                            ))}
+                          </Stack>
+                        </Box>
                       )}
                     </Box>
                   )}
@@ -647,9 +878,15 @@ const PdfOperations = () => {
                             fullWidth
                             label="Page A"
                             value={swapPages.left}
-                            onChange={(e) => setSwapPages((prev) => ({ ...prev, left: e.target.value }))}
+                            onChange={(e) => {
+                              setSwapPages((prev) => ({ ...prev, left: e.target.value }));
+                              if (fieldErrors.swapLeft) {
+                                setFieldErrors((prev) => ({ ...prev, swapLeft: '' }));
+                              }
+                            }}
                             inputProps={{ inputMode: 'numeric', pattern: '[0-9]*' }}
-                            helperText={pageHint}
+                            error={Boolean(fieldErrors.swapLeft)}
+                            helperText={fieldErrors.swapLeft || 'First page number'}
                           />
                         </Grid>
                         <Grid item xs={12} sm={6}>
@@ -657,9 +894,15 @@ const PdfOperations = () => {
                             fullWidth
                             label="Page B"
                             value={swapPages.right}
-                            onChange={(e) => setSwapPages((prev) => ({ ...prev, right: e.target.value }))}
+                            onChange={(e) => {
+                              setSwapPages((prev) => ({ ...prev, right: e.target.value }));
+                              if (fieldErrors.swapRight) {
+                                setFieldErrors((prev) => ({ ...prev, swapRight: '' }));
+                              }
+                            }}
                             inputProps={{ inputMode: 'numeric', pattern: '[0-9]*' }}
-                            helperText="Both pages are required"
+                            error={Boolean(fieldErrors.swapRight)}
+                            helperText={fieldErrors.swapRight || 'Second page number'}
                           />
                         </Grid>
                       </Grid>
@@ -681,15 +924,14 @@ const PdfOperations = () => {
                       onChange={(e) => {
                         const next = e.target.value;
                         if (next.includes('.')) {
-                          setSnackbar({
-                            open: true,
-                            message: 'Dots are not allowed in the output name. “.pdf” is added automatically.',
-                            severity: 'warning',
-                          });
+                          setFieldErrors((prev) => ({ ...prev, outputName: "No need to add .pdf - we'll add that for you!" }));
+                        } else if (fieldErrors.outputName) {
+                          setFieldErrors((prev) => ({ ...prev, outputName: '' }));
                         }
                         setOutputName(next.replace(/\./g, ''));
                       }}
-                      // helperText="No dots allowed. “.pdf” is fixed."
+                      error={Boolean(fieldErrors.outputName)}
+                      helperText={fieldErrors.outputName || ''}
                       InputProps={{
                         endAdornment: <InputAdornment position="end">.pdf</InputAdornment>,
                       }}
@@ -713,7 +955,7 @@ const PdfOperations = () => {
                                 ? '2 selected'
                                 : 'missing'
                               : selectedPages.length
-                                ? `${selectedPages.length} added`
+                                ? `${selectedPages.length} item${selectedPages.length === 1 ? '' : 's'} added`
                                 : 'missing'}
                           </span>
                         </Typography>
@@ -807,7 +1049,10 @@ const PdfOperations = () => {
 
         <Dialog
           open={isFeedbackOpen}
-          onClose={() => setIsFeedbackOpen(false)}
+          onClose={() => {
+            setIsFeedbackOpen(false);
+            setFeedbackError('');
+          }}
           fullWidth
           maxWidth="sm"
           PaperProps={{
@@ -823,7 +1068,10 @@ const PdfOperations = () => {
             Feedback
             <IconButton
               aria-label="Close feedback"
-              onClick={() => setIsFeedbackOpen(false)}
+              onClick={() => {
+                setIsFeedbackOpen(false);
+                setFeedbackError('');
+              }}
               sx={{ position: 'absolute', right: 8, top: 8 }}
             >
               <CloseIcon />
@@ -858,11 +1106,18 @@ const PdfOperations = () => {
                   fullWidth
                   label="Your feedback"
                   value={feedbackMessage}
-                  onChange={(e) => setFeedbackMessage(e.target.value)}
+                  onChange={(e) => {
+                    setFeedbackMessage(e.target.value);
+                    if (feedbackError) {
+                      setFeedbackError('');
+                    }
+                  }}
                   name="message"
                   multiline
                   minRows={8}
                   autoFocus
+                  error={Boolean(feedbackError)}
+                  helperText={feedbackError}
                 />
               </Stack>
             </Box>
@@ -871,7 +1126,10 @@ const PdfOperations = () => {
             <Typography variant="caption" color="text.secondary" sx={{ flexGrow: 1 }}>
               Powered by Netlify Forms
             </Typography>
-            <Button onClick={() => setIsFeedbackOpen(false)} color="secondary">
+            <Button onClick={() => {
+              setIsFeedbackOpen(false);
+              setFeedbackError('');
+            }} color="secondary">
               Cancel
             </Button>
             <Button onClick={handleFeedbackSubmit} variant="contained" disabled={isSubmittingFeedback}>
@@ -880,68 +1138,107 @@ const PdfOperations = () => {
           </DialogActions>
         </Dialog>
 
-        {/* Strong, attention-grabbing user messages */}
+        {/* User feedback messages */}
         <Backdrop
-          open={snackbar.open}
+          open={snackbar.open && snackbar.severity === 'error'}
           onClick={handleClose}
           sx={{
             zIndex: 1390,
-            bgcolor: 'rgba(0,0,0,0.55)',
+            bgcolor: 'rgba(0,0,0,0.35)',
             backdropFilter: 'blur(2px)',
           }}
         />
         <Snackbar
           open={snackbar.open}
-          autoHideDuration={6500}
+          autoHideDuration={snackbar.severity === 'info' ? 4000 : 6500}
           onClose={handleClose}
           anchorOrigin={{ vertical: 'top', horizontal: 'center' }}
           TransitionComponent={SnackbarTransition}
           sx={{
-            // Keep it below the AppBar and very visible.
             mt: { xs: 7, sm: 9 },
             '& .MuiSnackbarContent-root': { width: '100%' },
             zIndex: 1400,
           }}
         >
-          <Alert
-            onClose={handleClose}
-            severity={snackbar.severity}
-            variant="filled"
-            sx={{
-              // Force solid, high-contrast backgrounds (some MUI variants can look translucent on dark themes).
-              backgroundColor:
-                snackbar.severity === 'success'
-                  ? '#1B5E20'
-                  : snackbar.severity === 'error'
-                    ? '#B71C1C'
-                    : snackbar.severity === 'warning'
-                      ? '#E65100'
-                      : '#0D47A1',
-              color: '#FFFFFF',
-              width: { xs: 'calc(100vw - 24px)', sm: 620 },
-              maxWidth: '100%',
-              fontSize: '1.05rem',
-              fontWeight: 900,
-              letterSpacing: '-0.01em',
-              border: '2px solid rgba(255,255,255,0.22)',
-              borderRadius: 2.5,
-              px: 2.25,
-              py: 1.75,
-              boxShadow: '0 22px 70px rgba(0,0,0,0.6)',
-            }}
-            action={
-              <Button
-                color="inherit"
-                size="small"
-                onClick={handleClose}
-                sx={{ fontWeight: 900, letterSpacing: '0.02em' }}
+          <Box sx={{ position: 'relative', display: 'inline-block' }}>
+            <Alert
+              onClose={handleClose}
+              severity={snackbar.severity}
+              variant="filled"
+              className={snackbar.severity === 'info' ? 'info-snackbar' : ''}
+              sx={{
+                backgroundColor:
+                  snackbar.severity === 'success'
+                    ? '#1B5E20'
+                    : snackbar.severity === 'error'
+                      ? '#B71C1C'
+                      : snackbar.severity === 'warning'
+                        ? '#E65100'
+                        : '#FF8C42', // Orange background for info
+                color: '#FFFFFF',
+                width: { xs: 'calc(100vw - 32px)', sm: 480 },
+                maxWidth: '100%',
+                fontSize: snackbar.severity === 'info' ? '0.95rem' : '1.05rem',
+                fontWeight: snackbar.severity === 'info' ? 700 : 900,
+                letterSpacing: '-0.01em',
+                border: snackbar.severity === 'info' 
+                  ? '2px solid rgba(255, 255, 255, 0.3)' 
+                  : '2px solid rgba(255,255,255,0.22)',
+                borderRadius: 2,
+                px: 2,
+                py: snackbar.severity === 'info' ? 1.25 : 1.75,
+                boxShadow: snackbar.severity === 'info'
+                  ? '0 8px 32px rgba(255, 140, 66, 0.5), 0 4px 12px rgba(0, 0, 0, 0.3)'
+                  : '0 22px 70px rgba(0,0,0,0.6)',
+                overflow: 'hidden',
+                position: 'relative',
+              }}
+              icon={snackbar.severity === 'info' ? false : undefined}
+              action={
+                <IconButton
+                  size="small"
+                  onClick={handleClose}
+                  sx={{ 
+                    color: '#FFFFFF',
+                    opacity: 0.9,
+                    '&:hover': {
+                      opacity: 1,
+                      backgroundColor: 'rgba(255, 255, 255, 0.15)',
+                    }
+                  }}
+                >
+                  <CloseIcon fontSize="small" />
+                </IconButton>
+              }
+            >
+              {snackbar.message}
+            </Alert>
+            {snackbar.severity === 'info' && (
+              <Box
+                className="snackbar-countdown-bar"
+                sx={{
+                  position: 'absolute',
+                  bottom: 0,
+                  left: 0,
+                  right: 0,
+                  height: '4px',
+                  backgroundColor: 'rgba(255, 255, 255, 0.25)',
+                  borderRadius: '0 0 8px 8px',
+                  overflow: 'hidden',
+                  zIndex: 1,
+                }}
               >
-                OK
-              </Button>
-            }
-          >
-            {snackbar.message}
-          </Alert>
+                <Box
+                  sx={{
+                    height: '100%',
+                    backgroundColor: '#FFFFFF',
+                    animation: 'countdown-shrink 4s linear forwards',
+                    transformOrigin: 'left',
+                  }}
+                />
+              </Box>
+            )}
+          </Box>
         </Snackbar>
       </Box>
     </ThemeProvider>
