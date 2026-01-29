@@ -38,6 +38,23 @@ import RestartAltIcon from '@mui/icons-material/RestartAlt';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import CloseIcon from '@mui/icons-material/Close';
 import FeedbackOutlinedIcon from '@mui/icons-material/FeedbackOutlined';
+import DragIndicatorIcon from '@mui/icons-material/DragIndicator';
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+} from '@dnd-kit/core';
+import {
+  arrayMove,
+  SortableContext,
+  sortableKeyboardCoordinates,
+  useSortable,
+  verticalListSortingStrategy,
+} from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
 import './App.css';
 
 // Sunny & Warm palette theme
@@ -106,7 +123,7 @@ const SnackbarTransition = (props) => <Slide {...props} direction="down" />;
 const operationDetails = {
   merge: {
     title: 'Merge PDFs',
-    helper: 'Combine 2 or more PDFs in the order you add them.',
+    helper: 'Combine 2 or more PDFs. Upload files and drag to reorder before merging.',
   },
   swap: {
     title: 'Swap Pages',
@@ -177,6 +194,112 @@ const LoadingResult = ({ operationTitle, progress }) => {
   );
 };
 
+const SortableFileItem = ({ file, index, onRemove }) => {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: file.id });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+  };
+
+  return (
+    <Box
+      ref={setNodeRef}
+      style={style}
+      sx={{
+        display: 'flex',
+        alignItems: 'center',
+        gap: 1,
+        mb: 1,
+        p: 1.5,
+        borderRadius: 2,
+        background: isDragging
+          ? 'rgba(255, 140, 66, 0.15)'
+          : 'rgba(249, 199, 132, 0.08)',
+        border: isDragging
+          ? '2px solid rgba(255, 140, 66, 0.6)'
+          : '2px solid rgba(249, 199, 132, 0.3)',
+        transition: 'all 0.2s ease',
+        cursor: isDragging ? 'grabbing' : 'default',
+        '&:hover': {
+          background: 'rgba(249, 199, 132, 0.12)',
+          borderColor: 'rgba(249, 199, 132, 0.5)',
+        },
+      }}
+    >
+      <IconButton
+        {...attributes}
+        {...listeners}
+        size="small"
+        sx={{
+          cursor: 'grab',
+          color: 'var(--sandy-brown)',
+          '&:active': {
+            cursor: 'grabbing',
+          },
+        }}
+      >
+        <DragIndicatorIcon />
+      </IconButton>
+      <Box
+        sx={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: 1,
+          flex: 1,
+          minWidth: 0,
+        }}
+      >
+        <Typography
+          variant="caption"
+          sx={{
+            fontWeight: 700,
+            color: 'var(--pumpkin-spice)',
+            minWidth: '24px',
+          }}
+        >
+          #{index + 1}
+        </Typography>
+        <PictureAsPdfIcon sx={{ color: 'var(--apricot-cream)', fontSize: 20 }} />
+        <Typography
+          variant="body2"
+          sx={{
+            flex: 1,
+            fontWeight: 600,
+            color: 'var(--white)',
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+            whiteSpace: 'nowrap',
+          }}
+        >
+          {file.name}
+        </Typography>
+      </Box>
+      <IconButton
+        size="small"
+        onClick={onRemove}
+        sx={{
+          color: 'var(--pumpkin-spice)',
+          '&:hover': {
+            color: '#FF9F5A',
+            transform: 'scale(1.1)',
+          },
+        }}
+      >
+        <DeleteIcon fontSize="small" />
+      </IconButton>
+    </Box>
+  );
+};
+
 const PdfOperations = () => {
   const [file, setFile] = useState(null);
   const [mergeFiles, setMergeFiles] = useState([]);
@@ -211,6 +334,18 @@ const PdfOperations = () => {
   const mergeCount = mergeFiles.length;
   const hasFilesSelected = operation === 'merge' ? mergeFiles.length > 0 : Boolean(file);
 
+  // Drag and drop sensors
+  const sensors = useSensors(
+    useSensor(PointerSensor, {
+      activationConstraint: {
+        distance: 8,
+      },
+    }),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    })
+  );
+
   useEffect(() => {
     if (!isSubmitting) return;
 
@@ -242,13 +377,31 @@ const PdfOperations = () => {
   const handleMergeFileChange = (event) => {
     const newFiles = Array.from(event.target.files);
     if (newFiles.length) {
-      setMergeFiles((prev) => [...prev, ...newFiles]);
+      // Add unique IDs to each file for drag-and-drop
+      const filesWithIds = newFiles.map((file) => ({
+        id: `${Date.now()}-${Math.random()}`,
+        file,
+        name: file.name,
+      }));
+      setMergeFiles((prev) => [...prev, ...filesWithIds]);
       if (fieldErrors.mergeFiles) {
         setFieldErrors((prev) => ({ ...prev, mergeFiles: '' }));
       }
     }
     // Allow adding the same file again after removing/resetting.
     event.target.value = '';
+  };
+
+  const handleDragEnd = (event) => {
+    const { active, over } = event;
+
+    if (over && active.id !== over.id) {
+      setMergeFiles((items) => {
+        const oldIndex = items.findIndex((item) => item.id === active.id);
+        const newIndex = items.findIndex((item) => item.id === over.id);
+        return arrayMove(items, oldIndex, newIndex);
+      });
+    }
   };
 
   const handleOperationChange = (event) => {
@@ -381,8 +534,8 @@ const PdfOperations = () => {
     setSelectedPages((prev) => prev.filter((group) => group.id !== groupId));
   };
 
-  const removeMergeFile = (fileToRemove) => {
-    setMergeFiles((prev) => prev.filter((f) => f !== fileToRemove));
+  const removeMergeFile = (fileId) => {
+    setMergeFiles((prev) => prev.filter((f) => f.id !== fileId));
   };
 
   const removeSingleFile = () => {
@@ -491,7 +644,7 @@ const PdfOperations = () => {
       }
 
       if (operation === 'merge') {
-        mergeFiles.forEach((f) => formData.append('file', f));
+        mergeFiles.forEach((fileObj) => formData.append('file', fileObj.file));
       } else {
         formData.append('file', file);
         if (operation === 'swap') {
@@ -705,19 +858,30 @@ const PdfOperations = () => {
                           </label>
                           {mergeFiles.length > 0 ? (
                             <>
-                              <Stack direction="row" spacing={1} flexWrap="wrap" sx={{ gap: 1, mb: 1.5 }}>
-                                {mergeFiles.map((selectedFile, index) => (
-                                  <Chip
-                                    key={`${selectedFile.name}-${index}`}
-                                    icon={<PictureAsPdfIcon />}
-                                    label={selectedFile.name}
-                                    onDelete={() => removeMergeFile(selectedFile)}
-                                    deleteIcon={<DeleteIcon />}
-                                    className="file-chip"
-                                    sx={{ maxWidth: '100%' }}
-                                  />
-                                ))}
-                              </Stack>
+                              <Box sx={{ mb: 1.5 }}>
+                                <Typography variant="caption" sx={{ color: 'var(--sandy-brown)', fontWeight: 700, mb: 1, display: 'block' }}>
+                                  Drag files to reorder • Merge happens from top to bottom
+                                </Typography>
+                                <DndContext
+                                  sensors={sensors}
+                                  collisionDetection={closestCenter}
+                                  onDragEnd={handleDragEnd}
+                                >
+                                  <SortableContext
+                                    items={mergeFiles.map((f) => f.id)}
+                                    strategy={verticalListSortingStrategy}
+                                  >
+                                    {mergeFiles.map((fileObj, index) => (
+                                      <SortableFileItem
+                                        key={fileObj.id}
+                                        file={fileObj}
+                                        index={index}
+                                        onRemove={() => removeMergeFile(fileObj.id)}
+                                      />
+                                    ))}
+                                  </SortableContext>
+                                </DndContext>
+                              </Box>
                               <Typography variant="caption" sx={{ color: 'success.light', fontWeight: 600 }}>
                                 ✓ {mergeCount} file{mergeCount === 1 ? '' : 's'} selected
                               </Typography>
@@ -725,7 +889,7 @@ const PdfOperations = () => {
                           ) : (
                             <Box className="upload-hint">
                               <Typography variant="body2" color="text.secondary">
-                                Add at least 2 PDFs in the order you want them merged.
+                                Add at least 2 PDFs • Drag to reorder after uploading
                               </Typography>
                             </Box>
                           )}

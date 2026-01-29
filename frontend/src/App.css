@@ -1025,4 +1025,30 @@
   color: var(--white);
 }
 
+/* Drag and Drop Styles */
+.sortable-file-item {
+  touch-action: none;
+}
+
+.sortable-file-item--dragging {
+  z-index: 1000;
+  cursor: grabbing !important;
+}
+
+/* Drag handle pulse animation */
+@keyframes drag-pulse {
+  0%, 100% {
+    transform: scale(1);
+    opacity: 0.8;
+  }
+  50% {
+    transform: scale(1.1);
+    opacity: 1;
+  }
+}
+
+.MuiIconButton-root[aria-roledescription="sortable"] {
+  animation: drag-pulse 2s ease-in-out infinite;
+}
+
 
