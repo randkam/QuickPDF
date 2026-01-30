@@ -28,6 +28,7 @@ import {
   TextField,
   ThemeProvider,
   Toolbar,
+  Tooltip,
   Typography,
 } from '@mui/material';
 import CloudUploadIcon from '@mui/icons-material/CloudUpload';
@@ -229,6 +230,17 @@ const SortableFileItem = ({ file, index, totalFiles, onRemove, onMoveUp, onMoveD
 
   const isFirst = index === 0;
   const isLast = index === totalFiles - 1;
+  
+  // Get the filename - handle multiple possible shapes (File, wrapper object, backend-ish names)
+  const fileNameRaw =
+    (typeof file === 'string' ? file : null) ??
+    file?.name ??
+    file?.file?.name ??
+    file?.fileName ??
+    file?.filename ??
+    file?.originalname ??
+    '';
+  const fileName = String(fileNameRaw).trim() || 'Unknown file';
 
   return (
     <Box
@@ -236,10 +248,11 @@ const SortableFileItem = ({ file, index, totalFiles, onRemove, onMoveUp, onMoveD
       style={style}
       sx={{
         display: 'flex',
-        alignItems: 'center',
-        gap: { xs: 0.5, sm: 1 },
+        flexDirection: { xs: 'column', sm: 'row' },
+        alignItems: { xs: 'stretch', sm: 'center' },
+        gap: { xs: 0.75, sm: 1 },
         mb: 1,
-        p: { xs: 1, sm: 1.5 },
+        p: { xs: 1.25, sm: 1.5 },
         borderRadius: 2,
         background: isDragging
           ? 'rgba(255, 140, 66, 0.15)'
@@ -256,105 +269,175 @@ const SortableFileItem = ({ file, index, totalFiles, onRemove, onMoveUp, onMoveD
         touchAction: 'none',
       }}
     >
-      {/* Drag handle - visible on desktop */}
-      <IconButton
-        {...attributes}
-        {...listeners}
-        size="small"
-        sx={{
-          cursor: 'grab',
-          color: 'var(--sandy-brown)',
-          display: { xs: 'none', sm: 'flex' },
-          '&:active': {
-            cursor: 'grabbing',
-          },
-        }}
-      >
-        <DragIndicatorIcon />
-      </IconButton>
-
-      {/* Mobile controls - up/down buttons */}
-      <Box sx={{ display: { xs: 'flex', sm: 'none' }, flexDirection: 'column', gap: 0.25 }}>
-        <IconButton
-          size="small"
-          onClick={onMoveUp}
-          disabled={isFirst}
-          sx={{
-            padding: '2px',
-            color: isFirst ? 'rgba(249, 199, 132, 0.3)' : 'var(--sandy-brown)',
-            '&:hover': {
-              transform: isFirst ? 'none' : 'scale(1.15)',
-            },
-          }}
-        >
-          <ArrowUpwardIcon sx={{ fontSize: 16 }} />
-        </IconButton>
-        <IconButton
-          size="small"
-          onClick={onMoveDown}
-          disabled={isLast}
-          sx={{
-            padding: '2px',
-            color: isLast ? 'rgba(249, 199, 132, 0.3)' : 'var(--sandy-brown)',
-            '&:hover': {
-              transform: isLast ? 'none' : 'scale(1.15)',
-            },
-          }}
-        >
-          <ArrowDownwardIcon sx={{ fontSize: 16 }} />
-        </IconButton>
-      </Box>
-
+      {/* Top row: Controls + File info on mobile, single row on desktop */}
       <Box
         sx={{
           display: 'flex',
           alignItems: 'center',
           gap: { xs: 0.5, sm: 1 },
-          flex: 1,
-          minWidth: 0,
+          width: '100%',
         }}
       >
-        <Typography
-          variant="caption"
+        {/* Drag handle - visible on desktop */}
+        <IconButton
+          {...attributes}
+          {...listeners}
+          size="small"
           sx={{
-            fontWeight: 700,
+            cursor: 'grab',
+            color: 'var(--sandy-brown)',
+            display: { xs: 'none', sm: 'flex' },
+            '&:active': {
+              cursor: 'grabbing',
+            },
+          }}
+        >
+          <DragIndicatorIcon />
+        </IconButton>
+
+        {/* Mobile controls - up/down buttons */}
+        <Box sx={{ display: { xs: 'flex', sm: 'none' }, flexDirection: 'column', gap: 0.25 }}>
+          <IconButton
+            size="small"
+            onClick={onMoveUp}
+            disabled={isFirst}
+            sx={{
+              padding: '2px',
+              color: isFirst ? 'rgba(249, 199, 132, 0.3)' : 'var(--sandy-brown)',
+              '&:hover': {
+                transform: isFirst ? 'none' : 'scale(1.15)',
+              },
+            }}
+          >
+            <ArrowUpwardIcon sx={{ fontSize: 16 }} />
+          </IconButton>
+          <IconButton
+            size="small"
+            onClick={onMoveDown}
+            disabled={isLast}
+            sx={{
+              padding: '2px',
+              color: isLast ? 'rgba(249, 199, 132, 0.3)' : 'var(--sandy-brown)',
+              '&:hover': {
+                transform: isLast ? 'none' : 'scale(1.15)',
+              },
+            }}
+          >
+            <ArrowDownwardIcon sx={{ fontSize: 16 }} />
+          </IconButton>
+        </Box>
+
+        {/* File number badge */}
+        <Box
+          sx={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            minWidth: { xs: '28px', sm: '32px' },
+            height: { xs: '28px', sm: '32px' },
+            borderRadius: '50%',
+            background: 'rgba(255, 140, 66, 0.2)',
+            border: '2px solid rgba(255, 140, 66, 0.5)',
+          }}
+        >
+          <Typography
+            variant="caption"
+            sx={{
+              fontWeight: 800,
+              color: 'var(--pumpkin-spice)',
+              fontSize: { xs: '0.75rem', sm: '0.8rem' },
+              lineHeight: 1,
+            }}
+          >
+            {index + 1}
+          </Typography>
+        </Box>
+
+        {/* File info - icon and name */}
+        <Box
+          sx={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: { xs: 0.75, sm: 1 },
+            flex: '1 1 0',
+            minWidth: 0,
+          }}
+        >
+          <PictureAsPdfIcon 
+            sx={{ 
+              color: 'var(--apricot-cream)', 
+              fontSize: { xs: 20, sm: 22 },
+              flexShrink: 0,
+            }} 
+          />
+          <Tooltip
+            title={fileName}
+            arrow
+            placement="top"
+            enterDelay={350}
+            /* Touch devices: allow tap/press to reveal full name */
+            enterTouchDelay={0}
+            leaveTouchDelay={4000}
+            describeChild
+            componentsProps={{
+              tooltip: {
+                sx: {
+                  maxWidth: { xs: 260, sm: 360, md: 520 },
+                  whiteSpace: 'normal',
+                  wordBreak: 'break-word',
+                },
+              },
+            }}
+          >
+            <Typography
+              variant="body2"
+              // Keep native tooltip as a fallback (e.g. if Tooltip is disabled)
+              title={fileName}
+              tabIndex={0}
+              sx={{
+                flex: 1,
+                minWidth: 0,
+                fontWeight: 600,
+                color: 'var(--white)',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                whiteSpace: { xs: 'normal', sm: 'nowrap' },
+                display: { xs: '-webkit-box', sm: 'block' },
+                WebkitLineClamp: { xs: 2, sm: 'unset' },
+                WebkitBoxOrient: { xs: 'vertical', sm: 'unset' },
+                fontSize: { xs: '0.85rem', sm: '0.875rem' },
+                lineHeight: { xs: 1.4, sm: 1.5 },
+                wordBreak: 'break-word',
+                outline: 'none',
+                '&:focus-visible': {
+                  boxShadow: '0 0 0 3px rgba(255, 140, 66, 0.25)',
+                  borderRadius: 8,
+                },
+              }}
+            >
+              {fileName}
+            </Typography>
+          </Tooltip>
+        </Box>
+
+        {/* Delete button */}
+        <IconButton
+          size="small"
+          onClick={onRemove}
+          sx={{
             color: 'var(--pumpkin-spice)',
-            minWidth: { xs: '20px', sm: '24px' },
-            fontSize: { xs: '0.7rem', sm: '0.75rem' },
+            padding: { xs: '6px', sm: '8px' },
+            flexShrink: 0,
+            '&:hover': {
+              color: '#FF9F5A',
+              transform: 'scale(1.1)',
+              background: 'rgba(255, 140, 66, 0.1)',
+            },
           }}
         >
-          #{index + 1}
-        </Typography>
-        <PictureAsPdfIcon sx={{ color: 'var(--apricot-cream)', fontSize: { xs: 18, sm: 20 } }} />
-        <Typography
-          variant="body2"
-          sx={{
-            flex: 1,
-            fontWeight: 600,
-            color: 'var(--white)',
-            overflow: 'hidden',
-            textOverflow: 'ellipsis',
-            whiteSpace: 'nowrap',
-            fontSize: { xs: '0.8rem', sm: '0.875rem' },
-          }}
-        >
-          {file.name}
-        </Typography>
+          <DeleteIcon sx={{ fontSize: { xs: 20, sm: 22 } }} />
+        </IconButton>
       </Box>
-      <IconButton
-        size="small"
-        onClick={onRemove}
-        sx={{
-          color: 'var(--pumpkin-spice)',
-          padding: { xs: '4px', sm: '8px' },
-          '&:hover': {
-            color: '#FF9F5A',
-            transform: 'scale(1.1)',
-          },
-        }}
-      >
-        <DeleteIcon sx={{ fontSize: { xs: 18, sm: 20 } }} />
-      </IconButton>
     </Box>
   );
 };
