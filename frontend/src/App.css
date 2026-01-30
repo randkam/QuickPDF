@@ -1028,6 +1028,9 @@
 /* Drag and Drop Styles */
 .sortable-file-item {
   touch-action: none;
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
 }
 
 .sortable-file-item--dragging {
@@ -1049,6 +1052,301 @@
 
 .MuiIconButton-root[aria-roledescription="sortable"] {
   animation: drag-pulse 2s ease-in-out infinite;
+}
+
+/* Responsive breakpoints */
+
+/* Extra small devices (phones, less than 600px) */
+@media (max-width: 599px) {
+  .panel {
+    border-radius: 16px;
+  }
+  
+  .hero {
+    padding: 16px !important;
+    border-radius: 16px;
+  }
+  
+  .operation-form {
+    padding: 12px !important;
+    gap: 12px !important;
+  }
+  
+  .form-section {
+    padding: 10px;
+    border-radius: 12px;
+  }
+  
+  .form-section__header {
+    gap: 6px !important;
+  }
+  
+  .form-step {
+    width: 22px !important;
+    height: 22px !important;
+    font-size: 11px !important;
+  }
+  
+  /* Ensure touch targets are at least 44x44px */
+  .MuiIconButton-root {
+    min-width: 44px;
+    min-height: 44px;
+  }
+  
+  /* Buttons */
+  .MuiButton-root {
+    font-size: 0.85rem !important;
+    padding: 10px 16px !important;
+  }
+  
+  .MuiButton-contained {
+    padding: 12px 20px !important;
+  }
+  
+  /* Input fields */
+  .MuiOutlinedInput-root {
+    font-size: 0.9rem;
+  }
+  
+  .MuiInputLabel-root {
+    font-size: 0.9rem !important;
+  }
+  
+  /* Form helper text */
+  .MuiFormHelperText-root {
+    font-size: 0.7rem !important;
+  }
+  
+  /* Improve readability on mobile */
+  .MuiTypography-h3 {
+    font-size: 1.5rem !important;
+    line-height: 1.2;
+  }
+  
+  .MuiTypography-body1 {
+    font-size: 0.9rem;
+  }
+  
+  /* Chips */
+  .feature-chip {
+    padding: 10px 8px !important;
+    font-size: 0.7rem !important;
+  }
+  
+  .file-chip,
+  .page-chip {
+    padding: 10px 8px !important;
+    font-size: 0.75rem !important;
+  }
+  
+  /* Loading state */
+  .loading-state {
+    padding: 12px !important;
+  }
+  
+  .arrow-progress {
+    height: 14px !important;
+  }
+  
+  .arrow-progress__track {
+    height: 14px !important;
+  }
+  
+  .arrow-progress__head {
+    border-top: 9px solid transparent !important;
+    border-bottom: 9px solid transparent !important;
+    border-left: 14px solid rgba(252, 175, 88, 0.95) !important;
+  }
+  
+  .loading-cool-text {
+    font-size: 0.85rem;
+  }
+  
+  /* Success indicator */
+  .success-indicator {
+    padding: 12px !important;
+  }
+  
+  /* Empty state */
+  .empty-icon {
+    width: 60px !important;
+    height: 60px !important;
+  }
+  
+  .empty-icon svg {
+    font-size: 32px !important;
+  }
+  
+  /* Upload hint */
+  .upload-hint {
+    padding: 16px !important;
+  }
+}
+
+/* Small devices (tablets, 600px and up) */
+@media (min-width: 600px) and (max-width: 959px) {
+  .hero {
+    padding: 24px;
+  }
+  
+  .operation-form {
+    padding: 20px !important;
+  }
+  
+  .form-section {
+    padding: 14px;
+  }
+  
+  .MuiTypography-h3 {
+    font-size: 2rem !important;
+  }
+}
+
+/* Medium devices (small laptops, 960px and up) */
+@media (min-width: 960px) and (max-width: 1279px) {
+  .hero {
+    padding: 28px;
+  }
+  
+  .MuiTypography-h3 {
+    font-size: 2.5rem !important;
+  }
+}
+
+/* Large devices (desktops, 1280px and up) */
+@media (min-width: 1280px) {
+  .hero {
+    padding: 32px;
+  }
+  
+  .MuiTypography-h3 {
+    font-size: 3rem !important;
+  }
+}
+
+/* Improve touch feedback */
+@media (hover: none) and (pointer: coarse) {
+  /* Hide desktop drag indicators on touch devices */
+  .drag-handle-desktop {
+    display: none !important;
+  }
+  
+  /* Enhance button feedback on touch */
+  .MuiIconButton-root:active {
+    transform: scale(0.95);
+    transition: transform 0.1s ease;
+  }
+  
+  /* Enhance button touch feedback */
+  .MuiButton-root:active {
+    transform: scale(0.97) !important;
+    transition: transform 0.1s ease;
+  }
+  
+  /* Remove hover states that don't make sense on touch */
+  .panel:hover,
+  .hero:hover {
+    transform: none;
+  }
+  
+  .feature-chip:hover {
+    transform: none !important;
+  }
+  
+  .file-chip:hover,
+  .page-chip:hover {
+    transform: none;
+  }
+  
+  /* Better tap feedback */
+  .MuiChip-root:active {
+    transform: scale(0.97);
+    transition: transform 0.1s ease;
+  }
+}
+
+/* Landscape orientation fixes for mobile */
+@media (max-width: 959px) and (orientation: landscape) {
+  .hero {
+    padding: 16px !important;
+  }
+  
+  .MuiTypography-h3 {
+    font-size: 1.5rem !important;
+  }
+  
+  .operation-form {
+    padding: 16px !important;
+  }
+  
+  .form-section {
+    padding: 10px;
+  }
+}
+
+/* High DPI displays */
+@media (-webkit-min-device-pixel-ratio: 2), (min-resolution: 192dpi) {
+  /* Ensure text remains crisp on retina displays */
+  body {
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+}
+
+/* Accessibility: Reduce motion for users who prefer it */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+  
+  .arrow-progress__fill,
+  .arrow-progress__head,
+  .loading-cool-text__dots span,
+  .empty-icon {
+    animation: none !important;
+  }
+}
+
+/* Container width adjustments */
+@media (min-width: 1280px) {
+  .MuiContainer-root {
+    max-width: 1200px;
+  }
+}
+
+@media (min-width: 1536px) {
+  .MuiContainer-root {
+    max-width: 1400px;
+  }
+}
+
+/* Ensure proper scrolling on mobile */
+@media (max-width: 599px) {
+  html,
+  body {
+    overflow-x: hidden;
+  }
+  
+  .app-shell {
+    overflow-x: hidden;
+  }
+}
+
+/* Fix for safe area on notched devices */
+@supports (padding: env(safe-area-inset-left)) {
+  .app-bar {
+    padding-left: env(safe-area-inset-left);
+    padding-right: env(safe-area-inset-right);
+  }
+  
+  .MuiContainer-root {
+    padding-left: max(16px, env(safe-area-inset-left));
+    padding-right: max(16px, env(safe-area-inset-right));
+  }
 }
 
 

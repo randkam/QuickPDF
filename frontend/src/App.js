@@ -39,11 +39,14 @@ import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import CloseIcon from '@mui/icons-material/Close';
 import FeedbackOutlinedIcon from '@mui/icons-material/FeedbackOutlined';
 import DragIndicatorIcon from '@mui/icons-material/DragIndicator';
+import ArrowUpwardIcon from '@mui/icons-material/ArrowUpward';
+import ArrowDownwardIcon from '@mui/icons-material/ArrowDownward';
 import {
   DndContext,
   closestCenter,
   KeyboardSensor,
   PointerSensor,
+  TouchSensor,
   useSensor,
   useSensors,
 } from '@dnd-kit/core';
@@ -154,10 +157,24 @@ const normalizeDownloadUrl = (url) => {
 const LoadingResult = ({ operationTitle, progress }) => {
   return (
     <Box className="loading-state">
-      <Typography variant="subtitle1" sx={{ fontWeight: 800, mb: 0.5 }}>
+      <Typography 
+        variant="subtitle1" 
+        sx={{ 
+          fontWeight: 800, 
+          mb: 0.5,
+          fontSize: { xs: '0.9rem', sm: '1rem' },
+        }}
+      >
         Running {operationTitle}
       </Typography>
-      <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+      <Typography 
+        variant="body2" 
+        color="text.secondary" 
+        sx={{ 
+          mb: 2,
+          fontSize: { xs: '0.8rem', sm: '0.875rem' },
+        }}
+      >
         Please wait… your PDF is being processed.
       </Typography>
 
@@ -194,7 +211,7 @@ const LoadingResult = ({ operationTitle, progress }) => {
   );
 };
 
-const SortableFileItem = ({ file, index, onRemove }) => {
+const SortableFileItem = ({ file, index, totalFiles, onRemove, onMoveUp, onMoveDown }) => {
   const {
     attributes,
     listeners,
@@ -210,6 +227,9 @@ const SortableFileItem = ({ file, index, onRemove }) => {
     opacity: isDragging ? 0.5 : 1,
   };
 
+  const isFirst = index === 0;
+  const isLast = index === totalFiles - 1;
+
   return (
     <Box
       ref={setNodeRef}
@@ -217,9 +237,9 @@ const SortableFileItem = ({ file, index, onRemove }) => {
       sx={{
         display: 'flex',
         alignItems: 'center',
-        gap: 1,
+        gap: { xs: 0.5, sm: 1 },
         mb: 1,
-        p: 1.5,
+        p: { xs: 1, sm: 1.5 },
         borderRadius: 2,
         background: isDragging
           ? 'rgba(255, 140, 66, 0.15)'
@@ -233,8 +253,10 @@ const SortableFileItem = ({ file, index, onRemove }) => {
           background: 'rgba(249, 199, 132, 0.12)',
           borderColor: 'rgba(249, 199, 132, 0.5)',
         },
+        touchAction: 'none',
       }}
     >
+      {/* Drag handle - visible on desktop */}
       <IconButton
         {...attributes}
         {...listeners}
@@ -242,6 +264,7 @@ const SortableFileItem = ({ file, index, onRemove }) => {
         sx={{
           cursor: 'grab',
           color: 'var(--sandy-brown)',
+          display: { xs: 'none', sm: 'flex' },
           '&:active': {
             cursor: 'grabbing',
           },
@@ -249,11 +272,44 @@ const SortableFileItem = ({ file, index, onRemove }) => {
       >
         <DragIndicatorIcon />
       </IconButton>
+
+      {/* Mobile controls - up/down buttons */}
+      <Box sx={{ display: { xs: 'flex', sm: 'none' }, flexDirection: 'column', gap: 0.25 }}>
+        <IconButton
+          size="small"
+          onClick={onMoveUp}
+          disabled={isFirst}
+          sx={{
+            padding: '2px',
+            color: isFirst ? 'rgba(249, 199, 132, 0.3)' : 'var(--sandy-brown)',
+            '&:hover': {
+              transform: isFirst ? 'none' : 'scale(1.15)',
+            },
+          }}
+        >
+          <ArrowUpwardIcon sx={{ fontSize: 16 }} />
+        </IconButton>
+        <IconButton
+          size="small"
+          onClick={onMoveDown}
+          disabled={isLast}
+          sx={{
+            padding: '2px',
+            color: isLast ? 'rgba(249, 199, 132, 0.3)' : 'var(--sandy-brown)',
+            '&:hover': {
+              transform: isLast ? 'none' : 'scale(1.15)',
+            },
+          }}
+        >
+          <ArrowDownwardIcon sx={{ fontSize: 16 }} />
+        </IconButton>
+      </Box>
+
       <Box
         sx={{
           display: 'flex',
           alignItems: 'center',
-          gap: 1,
+          gap: { xs: 0.5, sm: 1 },
           flex: 1,
           minWidth: 0,
         }}
@@ -263,12 +319,13 @@ const SortableFileItem = ({ file, index, onRemove }) => {
           sx={{
             fontWeight: 700,
             color: 'var(--pumpkin-spice)',
-            minWidth: '24px',
+            minWidth: { xs: '20px', sm: '24px' },
+            fontSize: { xs: '0.7rem', sm: '0.75rem' },
           }}
         >
           #{index + 1}
         </Typography>
-        <PictureAsPdfIcon sx={{ color: 'var(--apricot-cream)', fontSize: 20 }} />
+        <PictureAsPdfIcon sx={{ color: 'var(--apricot-cream)', fontSize: { xs: 18, sm: 20 } }} />
         <Typography
           variant="body2"
           sx={{
@@ -278,6 +335,7 @@ const SortableFileItem = ({ file, index, onRemove }) => {
             overflow: 'hidden',
             textOverflow: 'ellipsis',
             whiteSpace: 'nowrap',
+            fontSize: { xs: '0.8rem', sm: '0.875rem' },
           }}
         >
           {file.name}
@@ -288,13 +346,14 @@ const SortableFileItem = ({ file, index, onRemove }) => {
         onClick={onRemove}
         sx={{
           color: 'var(--pumpkin-spice)',
+          padding: { xs: '4px', sm: '8px' },
           '&:hover': {
             color: '#FF9F5A',
             transform: 'scale(1.1)',
           },
         }}
       >
-        <DeleteIcon fontSize="small" />
+        <DeleteIcon sx={{ fontSize: { xs: 18, sm: 20 } }} />
       </IconButton>
     </Box>
   );
@@ -334,11 +393,17 @@ const PdfOperations = () => {
   const mergeCount = mergeFiles.length;
   const hasFilesSelected = operation === 'merge' ? mergeFiles.length > 0 : Boolean(file);
 
-  // Drag and drop sensors
+  // Drag and drop sensors - optimized for both desktop and mobile
   const sensors = useSensors(
     useSensor(PointerSensor, {
       activationConstraint: {
         distance: 8,
+      },
+    }),
+    useSensor(TouchSensor, {
+      activationConstraint: {
+        delay: 200,
+        tolerance: 8,
       },
     }),
     useSensor(KeyboardSensor, {
@@ -402,6 +467,26 @@ const PdfOperations = () => {
         return arrayMove(items, oldIndex, newIndex);
       });
     }
+  };
+
+  const handleMoveUp = (fileId) => {
+    setMergeFiles((items) => {
+      const index = items.findIndex((item) => item.id === fileId);
+      if (index > 0) {
+        return arrayMove(items, index, index - 1);
+      }
+      return items;
+    });
+  };
+
+  const handleMoveDown = (fileId) => {
+    setMergeFiles((items) => {
+      const index = items.findIndex((item) => item.id === fileId);
+      if (index < items.length - 1) {
+        return arrayMove(items, index, index + 1);
+      }
+      return items;
+    });
   };
 
   const handleOperationChange = (event) => {
@@ -744,38 +829,92 @@ const PdfOperations = () => {
       <CssBaseline />
       <Box className="app-shell">
         <AppBar position="static" elevation={0} className="app-bar">
-          <Toolbar>
-            <PictureAsPdfIcon sx={{ mr: 1 }} />
-            <Typography variant="h6" sx={{ flexGrow: 1, fontWeight: 700 }}>
+          <Toolbar sx={{ minHeight: { xs: 56, sm: 64 } }}>
+            <PictureAsPdfIcon sx={{ mr: { xs: 0.5, sm: 1 }, fontSize: { xs: 24, sm: 28 } }} />
+            <Typography variant="h6" sx={{ flexGrow: 1, fontWeight: 700, fontSize: { xs: '1rem', sm: '1.25rem' } }}>
               QuickPDF
             </Typography>
             <Button
               color="inherit"
-              startIcon={<FeedbackOutlinedIcon />}
+              startIcon={<FeedbackOutlinedIcon sx={{ display: { xs: 'none', sm: 'block' } }} />}
               onClick={() => setIsFeedbackOpen(true)}
-              sx={{ mr: 1 }}
+              sx={{ 
+                fontSize: { xs: '0.8rem', sm: '0.875rem' },
+                padding: { xs: '4px 8px', sm: '6px 16px' },
+                minWidth: { xs: 'auto', sm: '64px' },
+              }}
             >
-              Feedback
+              <Box component="span" sx={{ display: { xs: 'none', sm: 'inline' } }}>Feedback</Box>
+              <Box component="span" sx={{ display: { xs: 'inline', sm: 'none' } }}>💬</Box>
             </Button>
           </Toolbar>
         </AppBar>
 
-        <Container maxWidth="lg" sx={{ py: { xs: 3, md: 5 }, px: { xs: 2, md: 4 } }}>
-          <Paper elevation={6} className="hero" sx={{ mb: 4 }}>
-            <Stack spacing={2}>
+        <Container maxWidth="lg" sx={{ py: { xs: 2, sm: 3, md: 5 }, px: { xs: 2, sm: 3, md: 4 } }}>
+          <Paper elevation={6} className="hero" sx={{ mb: { xs: 3, sm: 4 } }}>
+            <Stack spacing={{ xs: 1.5, sm: 2 }}>
               <Box>
-                <Typography variant="h3" sx={{ fontWeight: 900, mb: 1.5, letterSpacing: '-0.02em' }}>
+                <Typography 
+                  variant="h3" 
+                  sx={{ 
+                    fontWeight: 900, 
+                    mb: { xs: 1, sm: 1.5 }, 
+                    letterSpacing: '-0.02em',
+                    fontSize: { xs: '1.5rem', sm: '2rem', md: '3rem' },
+                    lineHeight: { xs: 1.2, sm: 1.2 },
+                  }}
+                >
                   Edit PDFs without the clutter
                 </Typography>
-                <Typography variant="body1" color="text.secondary" sx={{ maxWidth: 640, fontSize: '1.1rem', lineHeight: 1.7 }}>
+                <Typography 
+                  variant="body1" 
+                  color="text.secondary" 
+                  sx={{ 
+                    maxWidth: 640, 
+                    fontSize: { xs: '0.9rem', sm: '1rem', md: '1.1rem' }, 
+                    lineHeight: { xs: 1.5, sm: 1.6, md: 1.7 },
+                  }}
+                >
                   Merge, swap, keep, or remove pages. Minimal inputs, instant download links.
                 </Typography>
               </Box>
-              <Stack direction="row" spacing={1.25} sx={{ mt: 2, flexWrap: 'wrap', gap: 1.25 }}>
-                <Chip icon={<CheckCircleIcon />} label="Merge PDFs" size="medium" className="feature-chip" />
-                <Chip icon={<CheckCircleIcon />} label="Swap pages" size="medium" className="feature-chip" />
-                <Chip icon={<CheckCircleIcon />} label="Remove pages" size="medium" className="feature-chip" />
-                <Chip icon={<CheckCircleIcon />} label="Keep pages" size="medium" className="feature-chip" />
+              <Stack 
+                direction="row" 
+                spacing={{ xs: 1, sm: 1.25 }} 
+                sx={{ 
+                  mt: { xs: 1, sm: 2 }, 
+                  flexWrap: 'wrap', 
+                  gap: { xs: 0.75, sm: 1.25 },
+                }}
+              >
+                <Chip 
+                  icon={<CheckCircleIcon sx={{ fontSize: { xs: '16px !important', sm: '20px !important' } }} />} 
+                  label="Merge PDFs" 
+                  size="medium" 
+                  className="feature-chip"
+                  sx={{ fontSize: { xs: '0.75rem', sm: '0.875rem' } }}
+                />
+                <Chip 
+                  icon={<CheckCircleIcon sx={{ fontSize: { xs: '16px !important', sm: '20px !important' } }} />} 
+                  label="Swap pages" 
+                  size="medium" 
+                  className="feature-chip"
+                  sx={{ fontSize: { xs: '0.75rem', sm: '0.875rem' } }}
+                />
+                <Chip 
+                  icon={<CheckCircleIcon sx={{ fontSize: { xs: '16px !important', sm: '20px !important' } }} />} 
+                  label="Remove pages" 
+                  size="medium" 
+                  className="feature-chip"
+                  sx={{ fontSize: { xs: '0.75rem', sm: '0.875rem' } }}
+                />
+                <Chip 
+                  icon={<CheckCircleIcon sx={{ fontSize: { xs: '16px !important', sm: '20px !important' } }} />} 
+                  label="Keep pages" 
+                  size="medium" 
+                  className="feature-chip"
+                  sx={{ fontSize: { xs: '0.75rem', sm: '0.875rem' } }}
+                />
               </Stack>
             </Stack>
           </Paper>
@@ -783,21 +922,21 @@ const PdfOperations = () => {
           <Box
             sx={{
               display: 'flex',
-              flexDirection: { xs: 'column', sm: 'row' },
-              gap: 3,
+              flexDirection: { xs: 'column', md: 'row' },
+              gap: { xs: 2, sm: 3 },
               alignItems: 'flex-start',
               width: '100%',
             }}
           >
-            <Box sx={{ flex: { xs: '1 1 auto', sm: '2 1 0' }, minWidth: 0 }}>
+            <Box sx={{ flex: { xs: '1 1 auto', md: '2 1 0' }, minWidth: 0, width: '100%' }}>
               <Paper elevation={4} className="panel operation-panel" sx={{ display: 'flex', flexDirection: 'column', width: '100%', minWidth: 0 }}>
                 <Box
                   component="form"
                   onSubmit={handleSubmit}
                   className="operation-form"
                   sx={{
-                    p: { xs: 2.5, md: 3 },
-                    gap: 2,
+                    p: { xs: 2, sm: 2.5, md: 3 },
+                    gap: { xs: 1.5, sm: 2 },
                     display: 'flex',
                     flexDirection: 'column',
                     width: '100%',
@@ -806,7 +945,13 @@ const PdfOperations = () => {
                   <Box className="form-section">
                     <Box className="form-section__header">
                       <span className="form-step">1</span>
-                      <Typography variant="subtitle1" sx={{ fontWeight: 800, fontSize: '1rem' }}>
+                      <Typography 
+                        variant="subtitle1" 
+                        sx={{ 
+                          fontWeight: 800, 
+                          fontSize: { xs: '0.9rem', sm: '1rem' },
+                        }}
+                      >
                         Choose an operation
                       </Typography>
                     </Box>
@@ -819,7 +964,15 @@ const PdfOperations = () => {
                         <MenuItem value="remove">Remove pages</MenuItem>
                       </Select>
                     </FormControl>
-                    <Typography variant="body2" color="text.secondary" sx={{ mt: 1, opacity: 0.9 }}>
+                    <Typography 
+                      variant="body2" 
+                      color="text.secondary" 
+                      sx={{ 
+                        mt: 1, 
+                        opacity: 0.9,
+                        fontSize: { xs: '0.8rem', sm: '0.875rem' },
+                      }}
+                    >
                       {selectedOperation.helper}
                     </Typography>
                   </Box>
@@ -827,7 +980,13 @@ const PdfOperations = () => {
                   <Box className="form-section">
                     <Box className="form-section__header">
                       <span className="form-step">2</span>
-                      <Typography variant="subtitle1" sx={{ fontWeight: 800, fontSize: '1rem' }}>
+                      <Typography 
+                        variant="subtitle1" 
+                        sx={{ 
+                          fontWeight: 800, 
+                          fontSize: { xs: '0.9rem', sm: '1rem' },
+                        }}
+                      >
                         Upload PDF{operation === 'merge' ? 's' : ''}
                       </Typography>
                     </Box>
@@ -859,8 +1018,22 @@ const PdfOperations = () => {
                           {mergeFiles.length > 0 ? (
                             <>
                               <Box sx={{ mb: 1.5 }}>
-                                <Typography variant="caption" sx={{ color: 'var(--sandy-brown)', fontWeight: 700, mb: 1, display: 'block' }}>
-                                  Drag files to reorder • Merge happens from top to bottom
+                                <Typography 
+                                  variant="caption" 
+                                  sx={{ 
+                                    color: 'var(--sandy-brown)', 
+                                    fontWeight: 700, 
+                                    mb: 1, 
+                                    display: 'block',
+                                    fontSize: { xs: '0.7rem', sm: '0.75rem' },
+                                  }}
+                                >
+                                  <Box component="span" sx={{ display: { xs: 'none', sm: 'inline' } }}>
+                                    Drag files to reorder • Merge happens from top to bottom
+                                  </Box>
+                                  <Box component="span" sx={{ display: { xs: 'inline', sm: 'none' } }}>
+                                    Use ↑↓ buttons to reorder • Merge happens top to bottom
+                                  </Box>
                                 </Typography>
                                 <DndContext
                                   sensors={sensors}
@@ -876,7 +1049,10 @@ const PdfOperations = () => {
                                         key={fileObj.id}
                                         file={fileObj}
                                         index={index}
+                                        totalFiles={mergeFiles.length}
                                         onRemove={() => removeMergeFile(fileObj.id)}
+                                        onMoveUp={() => handleMoveUp(fileObj.id)}
+                                        onMoveDown={() => handleMoveDown(fileObj.id)}
                                       />
                                     ))}
                                   </SortableContext>
@@ -888,8 +1064,13 @@ const PdfOperations = () => {
                             </>
                           ) : (
                             <Box className="upload-hint">
-                              <Typography variant="body2" color="text.secondary">
-                                Add at least 2 PDFs • Drag to reorder after uploading
+                              <Typography variant="body2" color="text.secondary" sx={{ fontSize: { xs: '0.8rem', sm: '0.875rem' } }}>
+                                <Box component="span" sx={{ display: { xs: 'none', sm: 'inline' } }}>
+                                  Add at least 2 PDFs • Drag to reorder after uploading
+                                </Box>
+                                <Box component="span" sx={{ display: { xs: 'inline', sm: 'none' } }}>
+                                  Add at least 2 PDFs • Reorder with ↑↓ buttons
+                                </Box>
                               </Typography>
                             </Box>
                           )}
@@ -954,7 +1135,13 @@ const PdfOperations = () => {
                     <Box className="form-section">
                       <Box className="form-section__header">
                         <span className="form-step form-step--muted">3</span>
-                        <Typography variant="subtitle1" sx={{ fontWeight: 800, fontSize: '1rem' }}>
+                        <Typography 
+                          variant="subtitle1" 
+                          sx={{ 
+                            fontWeight: 800, 
+                            fontSize: { xs: '0.9rem', sm: '1rem' },
+                          }}
+                        >
                           {operation === 'keep' ? 'Pages to Keep' : 'Pages to Remove'}
                         </Typography>
                       </Box>
@@ -1031,7 +1218,13 @@ const PdfOperations = () => {
                     <Box className="form-section">
                       <Box className="form-section__header">
                         <span className="form-step form-step--muted">3</span>
-                        <Typography variant="subtitle1" sx={{ fontWeight: 800, fontSize: '1rem' }}>
+                        <Typography 
+                          variant="subtitle1" 
+                          sx={{ 
+                            fontWeight: 800, 
+                            fontSize: { xs: '0.9rem', sm: '1rem' },
+                          }}
+                        >
                           Swap pages
                         </Typography>
                       </Box>
@@ -1076,7 +1269,13 @@ const PdfOperations = () => {
                   <Box className="form-section">
                     <Box className="form-section__header">
                       <span className="form-step form-step--muted">{operation === 'merge' ? '3' : '4'}</span>
-                      <Typography variant="subtitle1" sx={{ fontWeight: 800, fontSize: '1rem' }}>
+                      <Typography 
+                        variant="subtitle1" 
+                        sx={{ 
+                          fontWeight: 800, 
+                          fontSize: { xs: '0.9rem', sm: '1rem' },
+                        }}
+                      >
                         Output filename (optional)
                       </Typography>
                     </Box>
@@ -1139,14 +1338,27 @@ const PdfOperations = () => {
               </Paper>
             </Box>
 
-            <Box sx={{ flex: { xs: '1 1 auto', sm: '1 1 0' }, minWidth: 0 }}>
+            <Box sx={{ flex: { xs: '1 1 auto', md: '1 1 0' }, minWidth: 0, width: '100%' }}>
               <Paper elevation={4} className={`panel result-panel${isSubmitting ? ' result-panel--loading' : ''}${!isSubmitting && result ? ' result-panel--ready' : ''}`}>
-                <Stack spacing={2.25} sx={{ p: { xs: 2.5, md: 3 } }}>
+                <Stack spacing={{ xs: 1.5, sm: 2.25 }} sx={{ p: { xs: 2, sm: 2.5, md: 3 } }}>
                   <Box>
-                    <Typography variant="h6" sx={{ fontWeight: 700, fontSize: '1.25rem', mb: 0.5 }}>
+                    <Typography 
+                      variant="h6" 
+                      sx={{ 
+                        fontWeight: 700, 
+                        fontSize: { xs: '1rem', sm: '1.15rem', md: '1.25rem' }, 
+                        mb: 0.5,
+                      }}
+                    >
                       Result
                     </Typography>
-                    <Typography variant="body2" color="text.secondary">
+                    <Typography 
+                      variant="body2" 
+                      color="text.secondary"
+                      sx={{ 
+                        fontSize: { xs: '0.8rem', sm: '0.875rem' },
+                      }}
+                    >
                       Download link appears here after each run.
                     </Typography>
                   </Box>
@@ -1219,16 +1431,19 @@ const PdfOperations = () => {
           }}
           fullWidth
           maxWidth="sm"
+          fullScreen={false}
           PaperProps={{
             sx: {
               backgroundColor: 'rgba(10, 12, 20, 0.96)',
               border: '1px solid rgba(255, 255, 255, 0.14)',
               boxShadow: '0 24px 70px rgba(0,0,0,0.55)',
               backdropFilter: 'blur(10px)',
+              m: { xs: 2, sm: 4 },
+              maxHeight: { xs: 'calc(100% - 32px)', sm: 'calc(100% - 64px)' },
             },
           }}
         >
-          <DialogTitle sx={{ pr: 6 }}>
+          <DialogTitle sx={{ pr: 6, fontSize: { xs: '1.1rem', sm: '1.25rem' } }}>
             Feedback
             <IconButton
               aria-label="Close feedback"
@@ -1236,13 +1451,25 @@ const PdfOperations = () => {
                 setIsFeedbackOpen(false);
                 setFeedbackError('');
               }}
-              sx={{ position: 'absolute', right: 8, top: 8 }}
+              sx={{ 
+                position: 'absolute', 
+                right: 8, 
+                top: 8,
+                padding: { xs: '8px', sm: '12px' },
+              }}
             >
-              <CloseIcon />
+              <CloseIcon sx={{ fontSize: { xs: 20, sm: 24 } }} />
             </IconButton>
           </DialogTitle>
           <DialogContent dividers>
-            <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+            <Typography 
+              variant="body2" 
+              color="text.secondary" 
+              sx={{ 
+                mb: 2,
+                fontSize: { xs: '0.85rem', sm: '0.875rem' },
+              }}
+            >
               Have ideas or found a bug? Send it here.
             </Typography>
 
@@ -1286,17 +1513,44 @@ const PdfOperations = () => {
               </Stack>
             </Box>
           </DialogContent>
-          <DialogActions sx={{ px: 3, py: 2 }}>
-            <Typography variant="caption" color="text.secondary" sx={{ flexGrow: 1 }}>
+          <DialogActions sx={{ px: { xs: 2, sm: 3 }, py: { xs: 1.5, sm: 2 }, flexWrap: 'wrap', gap: 1 }}>
+            <Typography 
+              variant="caption" 
+              color="text.secondary" 
+              sx={{ 
+                flexGrow: 1,
+                fontSize: { xs: '0.7rem', sm: '0.75rem' },
+                width: { xs: '100%', sm: 'auto' },
+                textAlign: { xs: 'center', sm: 'left' },
+                order: { xs: 3, sm: 1 },
+              }}
+            >
               Powered by Netlify Forms
             </Typography>
-            <Button onClick={() => {
-              setIsFeedbackOpen(false);
-              setFeedbackError('');
-            }} color="secondary">
+            <Button 
+              onClick={() => {
+                setIsFeedbackOpen(false);
+                setFeedbackError('');
+              }} 
+              color="secondary"
+              sx={{
+                fontSize: { xs: '0.85rem', sm: '0.875rem' },
+                order: { xs: 1, sm: 2 },
+                flex: { xs: '1', sm: '0' },
+              }}
+            >
               Cancel
             </Button>
-            <Button onClick={handleFeedbackSubmit} variant="contained" disabled={isSubmittingFeedback}>
+            <Button 
+              onClick={handleFeedbackSubmit} 
+              variant="contained" 
+              disabled={isSubmittingFeedback}
+              sx={{
+                fontSize: { xs: '0.85rem', sm: '0.875rem' },
+                order: { xs: 2, sm: 3 },
+                flex: { xs: '1', sm: '0' },
+              }}
+            >
               {isSubmittingFeedback ? 'Sending…' : 'Send'}
             </Button>
           </DialogActions>
@@ -1319,12 +1573,15 @@ const PdfOperations = () => {
           anchorOrigin={{ vertical: 'top', horizontal: 'center' }}
           TransitionComponent={SnackbarTransition}
           sx={{
-            mt: { xs: 7, sm: 9 },
+            mt: { xs: '64px', sm: '72px' },
             '& .MuiSnackbarContent-root': { width: '100%' },
             zIndex: 1400,
+            width: { xs: 'calc(100% - 16px)', sm: 'auto' },
+            left: { xs: '8px', sm: 'auto' },
+            right: { xs: '8px', sm: 'auto' },
           }}
         >
-          <Box sx={{ position: 'relative', display: 'inline-block' }}>
+          <Box sx={{ position: 'relative', display: 'inline-block', width: '100%' }}>
             <Alert
               onClose={handleClose}
               severity={snackbar.severity}
@@ -1340,17 +1597,23 @@ const PdfOperations = () => {
                         ? '#E65100'
                         : '#FF8C42', // Orange background for info
                 color: '#FFFFFF',
-                width: { xs: 'calc(100vw - 32px)', sm: 480 },
+                width: { xs: '100%', sm: 480 },
                 maxWidth: '100%',
-                fontSize: snackbar.severity === 'info' ? '0.95rem' : '1.05rem',
+                fontSize: { 
+                  xs: snackbar.severity === 'info' ? '0.85rem' : '0.9rem',
+                  sm: snackbar.severity === 'info' ? '0.95rem' : '1.05rem',
+                },
                 fontWeight: snackbar.severity === 'info' ? 700 : 900,
                 letterSpacing: '-0.01em',
                 border: snackbar.severity === 'info' 
                   ? '2px solid rgba(255, 255, 255, 0.3)' 
                   : '2px solid rgba(255,255,255,0.22)',
-                borderRadius: 2,
-                px: 2,
-                py: snackbar.severity === 'info' ? 1.25 : 1.75,
+                borderRadius: { xs: 1.5, sm: 2 },
+                px: { xs: 1.5, sm: 2 },
+                py: { 
+                  xs: snackbar.severity === 'info' ? 1 : 1.25,
+                  sm: snackbar.severity === 'info' ? 1.25 : 1.75,
+                },
                 boxShadow: snackbar.severity === 'info'
                   ? '0 8px 32px rgba(255, 140, 66, 0.5), 0 4px 12px rgba(0, 0, 0, 0.3)'
                   : '0 22px 70px rgba(0,0,0,0.6)',
@@ -1358,6 +1621,10 @@ const PdfOperations = () => {
                 position: 'relative',
               }}
               icon={snackbar.severity === 'info' ? false : undefined}
+              iconMapping={{
+                success: <CheckCircleIcon sx={{ fontSize: { xs: 20, sm: 24 } }} />,
+                error: <CloseIcon sx={{ fontSize: { xs: 20, sm: 24 } }} />,
+              }}
               action={
                 <IconButton
                   size="small"
@@ -1365,13 +1632,14 @@ const PdfOperations = () => {
                   sx={{ 
                     color: '#FFFFFF',
                     opacity: 0.9,
+                    padding: { xs: '4px', sm: '8px' },
                     '&:hover': {
                       opacity: 1,
                       backgroundColor: 'rgba(255, 255, 255, 0.15)',
                     }
                   }}
                 >
-                  <CloseIcon fontSize="small" />
+                  <CloseIcon sx={{ fontSize: { xs: 18, sm: 20 } }} />
                 </IconButton>
               }
             >
