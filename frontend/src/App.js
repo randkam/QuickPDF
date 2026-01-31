@@ -42,6 +42,7 @@ import FeedbackOutlinedIcon from '@mui/icons-material/FeedbackOutlined';
 import DragIndicatorIcon from '@mui/icons-material/DragIndicator';
 import ArrowUpwardIcon from '@mui/icons-material/ArrowUpward';
 import ArrowDownwardIcon from '@mui/icons-material/ArrowDownward';
+import ZoomInIcon from '@mui/icons-material/ZoomIn';
 import {
   DndContext,
   closestCenter,
@@ -60,6 +61,8 @@ import {
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import './App.css';
+import PdfThumbnail from './PdfThumbnail';
+import PdfPreviewModal from './PdfPreviewModal';
 
 // Sunny & Warm palette theme
 // #4E598C - Dusk Blue (base)
@@ -109,8 +112,9 @@ const darkTheme = createTheme({
   },
 });
 
-// Local dev default (direct-to-backend); Docker/nginx sets REACT_APP_API_URL=/api at build time.
-const API_URL = process.env.REACT_APP_API_URL || 'http://127.0.0.1:5000/api';
+// Local dev: connect to docker-compose backend on port 8080
+// Production: REACT_APP_API_URL is set at build time
+const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:8080/api';
 const API_ORIGIN = API_URL.replace(/\/api\/?$/, '');
 
 const encodeNetlifyForm = (data) =>
@@ -212,7 +216,7 @@ const LoadingResult = ({ operationTitle, progress }) => {
   );
 };
 
-const SortableFileItem = ({ file, index, totalFiles, onRemove, onMoveUp, onMoveDown }) => {
+const SortableFileItem = ({ file, index, totalFiles, onRemove, onMoveUp, onMoveDown, onPreview }) => {
   const {
     attributes,
     listeners,
@@ -241,6 +245,9 @@ const SortableFileItem = ({ file, index, totalFiles, onRemove, onMoveUp, onMoveD
     file?.originalname ??
     '';
   const fileName = String(fileNameRaw).trim() || 'Unknown file';
+
+  // Get the actual File object for preview
+  const fileObject = file?.file || file;
 
   return (
     <Box
@@ -278,6 +285,22 @@ const SortableFileItem = ({ file, index, totalFiles, onRemove, onMoveUp, onMoveD
           width: '100%',
         }}
       >
+        {/* PDF Thumbnail Preview */}
+        <Box
+          sx={{
+            display: 'flex',
+            alignItems: 'center',
+            flexShrink: 0,
+          }}
+        >
+          <PdfThumbnail
+            file={fileObject}
+            onExpand={() => onPreview?.(fileObject, fileName)}
+            width={window.innerWidth < 600 ? 60 : 80}
+            showPageCount={true}
+          />
+        </Box>
+
         {/* Drag handle - visible on desktop */}
         <IconButton
           {...attributes}
@@ -467,6 +490,8 @@ const PdfOperations = () => {
   const [feedbackMessage, setFeedbackMessage] = useState('');
   const [isSubmittingFeedback, setIsSubmittingFeedback] = useState(false);
   const [feedbackError, setFeedbackError] = useState('');
+  const [previewFile, setPreviewFile] = useState(null);
+  const [previewFileName, setPreviewFileName] = useState('');
   const submittingAtRef = useRef(0);
   const abortRef = useRef(null);
   const fileInputRef = useRef(null);
@@ -844,7 +869,7 @@ const PdfOperations = () => {
       const downloadUrl = normalizeDownloadUrl(job.download_url || `/api/jobs/${jobId}/download`);
       const successMessage = 'Your PDF is ready.';
       const outputFileName = job.output_download_name || (outputName.trim() ? `${outputName.trim()}.pdf` : 'output.pdf');
-      setResult({ message: successMessage, downloadUrl, outputFileName });
+      setResult({ message: successMessage, downloadUrl, outputFileName, jobId });
     } catch (error) {
       setSnackbar({
         open: true,
@@ -903,6 +928,23 @@ const PdfOperations = () => {
       setSnackbar({ open: true, message: error.message || 'Unable to submit feedback. Please try again.', severity: 'error' });
     } finally {
       setIsSubmittingFeedback(false);
+    }
+  };
+
+  const handleOpenPreview = (file, fileName) => {
+    setPreviewFile(file);
+    setPreviewFileName(fileName);
+  };
+
+  const handleClosePreview = () => {
+    setPreviewFile(null);
+    setPreviewFileName('');
+  };
+
+  const handlePreviewResult = () => {
+    if (result?.downloadUrl) {
+      setPreviewFile(result.downloadUrl);
+      setPreviewFileName(result.outputFileName || 'output.pdf');
     }
   };
 
@@ -1136,6 +1178,7 @@ const PdfOperations = () => {
                                         onRemove={() => removeMergeFile(fileObj.id)}
                                         onMoveUp={() => handleMoveUp(fileObj.id)}
                                         onMoveDown={() => handleMoveDown(fileObj.id)}
+                                        onPreview={handleOpenPreview}
                                       />
                                     ))}
                                   </SortableContext>
@@ -1189,14 +1232,34 @@ const PdfOperations = () => {
                             </Button>
                           </label>
                           {file ? (
-                            <Chip
-                              icon={<PictureAsPdfIcon />}
-                              label={file.name}
-                              onDelete={removeSingleFile}
-                              deleteIcon={<DeleteIcon />}
-                              className="file-chip"
-                              sx={{ maxWidth: '100%' }}
-                            />
+                            <Box
+                              sx={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: 1.5,
+                                p: 1.5,
+                                borderRadius: 2,
+                                background: 'rgba(249, 199, 132, 0.08)',
+                                border: '2px solid rgba(249, 199, 132, 0.3)',
+                              }}
+                            >
+                              <PdfThumbnail
+                                file={file}
+                                onExpand={() => handleOpenPreview(file, file.name)}
+                                width={window.innerWidth < 600 ? 60 : 80}
+                                showPageCount={true}
+                              />
+                              <Box sx={{ flex: 1, minWidth: 0 }}>
+                                <Chip
+                                  icon={<PictureAsPdfIcon />}
+                                  label={file.name}
+                                  onDelete={removeSingleFile}
+                                  deleteIcon={<DeleteIcon />}
+                                  className="file-chip"
+                                  sx={{ maxWidth: '100%' }}
+                                />
+                              </Box>
+                            </Box>
                           ) : (
                             <Box className="upload-hint">
                               <Typography variant="body2" color="text.secondary">
@@ -1473,19 +1536,60 @@ const PdfOperations = () => {
                         Output: <span className="summary-pill summary-pill--ok">{result.outputFileName}</span>
                       </Typography>
                     )}
+                      
+                      {/* Output PDF Preview Thumbnail */}
                       {result.downloadUrl && (
-                        <Button
-                          variant="contained"
-                          size="large"
-                          startIcon={<DownloadIcon />}
-                          href={result.downloadUrl}
-                          target="_blank"
-                          rel="noreferrer"
-                          fullWidth
-                          className="download-button"
+                        <Box
+                          sx={{
+                            display: 'flex',
+                            justifyContent: 'center',
+                            p: 2,
+                            borderRadius: 2,
+                            background: 'rgba(120, 255, 210, 0.08)',
+                            border: '2px solid rgba(120, 255, 210, 0.3)',
+                          }}
                         >
-                          Download PDF
-                        </Button>
+                          <PdfThumbnail
+                            file={result.downloadUrl}
+                            onExpand={handlePreviewResult}
+                            width={window.innerWidth < 600 ? 120 : 160}
+                            showPageCount={true}
+                          />
+                        </Box>
+                      )}
+
+                      {result.downloadUrl && (
+                        <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5} sx={{ width: '100%' }}>
+                          <Button
+                            variant="outlined"
+                            size="large"
+                            startIcon={<ZoomInIcon />}
+                            onClick={handlePreviewResult}
+                            fullWidth
+                            sx={{
+                              borderColor: 'rgba(120, 255, 210, 0.5)',
+                              color: 'rgba(120, 255, 210, 0.95)',
+                              '&:hover': {
+                                borderColor: 'rgba(120, 255, 210, 0.8)',
+                                backgroundColor: 'rgba(120, 255, 210, 0.1)',
+                              },
+                            }}
+                          >
+                            Preview
+                          </Button>
+                          <Button
+                            variant="contained"
+                            size="large"
+                            startIcon={<DownloadIcon />}
+                            href={result.downloadUrl}
+                            target="_blank"
+                            rel="noreferrer"
+                            fullWidth
+                            className="download-button"
+                          >
+                            Download
+                          </Button>
+                        </Stack>
                       )}
                     </Stack>
                   ) : (
@@ -1638,6 +1742,14 @@ const PdfOperations = () => {
             </Button>
           </DialogActions>
         </Dialog>
+
+        {/* PDF Preview Modal */}
+        <PdfPreviewModal
+          open={Boolean(previewFile)}
+          onClose={handleClosePreview}
+          file={previewFile}
+          fileName={previewFileName}
+        />
 
         {/* User feedback messages */}
         <Backdrop
