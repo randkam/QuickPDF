@@ -44,4 +44,10 @@ class Config:
     # Worker safety defaults (seconds)
     RQ_JOB_TIMEOUT_S = int(os.environ.get("RQ_JOB_TIMEOUT_S", "180"))
 
+    # Data retention / download security
+    # - JOB_TTL_S: how long job records + outputs are kept after creation (seconds)
+    # - DELETE_OUTPUT_AFTER_DOWNLOAD: delete output + job record after download (deprecated; multi-download supported)
+    JOB_TTL_S = int(os.environ.get("JOB_TTL_S", "3600"))  # 1 hour
+    DELETE_OUTPUT_AFTER_DOWNLOAD = os.environ.get("DELETE_OUTPUT_AFTER_DOWNLOAD", "0").strip() not in {"0", "false", "False", "no", "NO"}
+
 

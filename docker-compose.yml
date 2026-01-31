@@ -15,8 +15,8 @@ services:
       - RQ_QUEUE_NAME=pdf
       - RQ_JOB_TIMEOUT_S=${RQ_JOB_TIMEOUT_S:-180}
     volumes:
-      - ./data/uploads:/data/uploads
-      - ./data/jobs:/data/jobs
+      - uploads:/data/uploads
+      - jobs:/data/jobs
     depends_on:
       - worker
       - redis
@@ -31,8 +31,8 @@ services:
       - RQ_QUEUE_NAME=pdf
       - CLEANUP_INPUTS=${CLEANUP_INPUTS:-1}
     volumes:
-      - ./data/uploads:/data/uploads
-      - ./data/jobs:/data/jobs
+      - uploads:/data/uploads
+      - jobs:/data/jobs
     depends_on:
       - redis
 
@@ -45,4 +45,7 @@ services:
     depends_on:
       - backend
 
+volumes:
+  uploads:
+  jobs:
 

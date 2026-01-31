@@ -2,7 +2,6 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Alert as MuiAlert,
   AppBar,
-  Backdrop,
   Box,
   Button,
   Chip,
@@ -159,6 +158,20 @@ const normalizeDownloadUrl = (url) => {
   return `${origin}${suffix}`;
 };
 
+const withQueryParam = (url, key, value) => {
+  if (!url) return url;
+  const hasQuery = url.includes('?');
+  const sep = hasQuery ? '&' : '?';
+  return `${url}${sep}${encodeURIComponent(key)}=${encodeURIComponent(String(value))}`;
+};
+
+const buildJobDownloadUrl = ({ baseUrl, token, consume }) => {
+  let url = baseUrl;
+  if (token) url = withQueryParam(url, 'token', token);
+  if (consume) url = withQueryParam(url, 'consume', '1');
+  return url;
+};
+
 const LoadingResult = ({ operationTitle, progress }) => {
   return (
     <Box className="loading-state">
@@ -216,7 +229,9 @@ const LoadingResult = ({ operationTitle, progress }) => {
   );
 };
 
-const SortableFileItem = ({ file, index, totalFiles, onRemove, onMoveUp, onMoveDown, onPreview }) => {
+const mergeItemDomId = (id) => `merge-file-item-${String(id).replace(/[^a-zA-Z0-9_-]/g, '_')}`;
+
+const SortableFileItem = ({ file, index, totalFiles, onRemove, onMoveUp, onMoveDown, onPreview, error }) => {
   const {
     attributes,
     listeners,
@@ -248,10 +263,12 @@ const SortableFileItem = ({ file, index, totalFiles, onRemove, onMoveUp, onMoveD
 
   // Get the actual File object for preview
   const fileObject = file?.file || file;
+  const hasError = Boolean(error);
 
   return (
     <Box
       ref={setNodeRef}
+      id={mergeItemDomId(file.id)}
       style={style}
       sx={{
         display: 'flex',
@@ -261,17 +278,21 @@ const SortableFileItem = ({ file, index, totalFiles, onRemove, onMoveUp, onMoveD
         mb: 1,
         p: { xs: 1.25, sm: 1.5 },
         borderRadius: 2,
-        background: isDragging
-          ? 'rgba(255, 140, 66, 0.15)'
-          : 'rgba(249, 199, 132, 0.08)',
-        border: isDragging
-          ? '2px solid rgba(255, 140, 66, 0.6)'
-          : '2px solid rgba(249, 199, 132, 0.3)',
+        background: hasError
+          ? 'rgba(255, 68, 68, 0.10)'
+          : isDragging
+            ? 'rgba(255, 140, 66, 0.15)'
+            : 'rgba(249, 199, 132, 0.08)',
+        border: hasError
+          ? '2px solid rgba(255, 68, 68, 0.65)'
+          : isDragging
+            ? '2px solid rgba(255, 140, 66, 0.6)'
+            : '2px solid rgba(249, 199, 132, 0.3)',
         transition: 'all 0.2s ease',
         cursor: isDragging ? 'grabbing' : 'default',
         '&:hover': {
-          background: 'rgba(249, 199, 132, 0.12)',
-          borderColor: 'rgba(249, 199, 132, 0.5)',
+          background: hasError ? 'rgba(255, 68, 68, 0.14)' : 'rgba(249, 199, 132, 0.12)',
+          borderColor: hasError ? 'rgba(255, 68, 68, 0.85)' : 'rgba(249, 199, 132, 0.5)',
         },
         touchAction: 'none',
       }}
@@ -393,54 +414,69 @@ const SortableFileItem = ({ file, index, totalFiles, onRemove, onMoveUp, onMoveD
               flexShrink: 0,
             }} 
           />
-          <Tooltip
-            title={fileName}
-            arrow
-            placement="top"
-            enterDelay={350}
-            /* Touch devices: allow tap/press to reveal full name */
-            enterTouchDelay={0}
-            leaveTouchDelay={4000}
-            describeChild
-            componentsProps={{
-              tooltip: {
-                sx: {
-                  maxWidth: { xs: 260, sm: 360, md: 520 },
-                  whiteSpace: 'normal',
-                  wordBreak: 'break-word',
-                },
-              },
-            }}
-          >
-            <Typography
-              variant="body2"
-              // Keep native tooltip as a fallback (e.g. if Tooltip is disabled)
+          <Box sx={{ flex: 1, minWidth: 0 }}>
+            <Tooltip
               title={fileName}
-              tabIndex={0}
-              sx={{
-                flex: 1,
-                minWidth: 0,
-                fontWeight: 600,
-                color: 'var(--white)',
-                overflow: 'hidden',
-                textOverflow: 'ellipsis',
-                whiteSpace: { xs: 'normal', sm: 'nowrap' },
-                display: { xs: '-webkit-box', sm: 'block' },
-                WebkitLineClamp: { xs: 2, sm: 'unset' },
-                WebkitBoxOrient: { xs: 'vertical', sm: 'unset' },
-                fontSize: { xs: '0.85rem', sm: '0.875rem' },
-                lineHeight: { xs: 1.4, sm: 1.5 },
-                wordBreak: 'break-word',
-                outline: 'none',
-                '&:focus-visible': {
-                  boxShadow: '0 0 0 3px rgba(255, 140, 66, 0.25)',
-                  borderRadius: 8,
+              arrow
+              placement="top"
+              enterDelay={350}
+              /* Touch devices: allow tap/press to reveal full name */
+              enterTouchDelay={0}
+              leaveTouchDelay={4000}
+              describeChild
+              componentsProps={{
+                tooltip: {
+                  sx: {
+                    maxWidth: { xs: 260, sm: 360, md: 520 },
+                    whiteSpace: 'normal',
+                    wordBreak: 'break-word',
+                  },
                 },
               }}
             >
-              {fileName}
-            </Typography>
-          </Tooltip>
+              <Typography
+                variant="body2"
+                // Keep native tooltip as a fallback (e.g. if Tooltip is disabled)
+                title={fileName}
+                tabIndex={0}
+                sx={{
+                  minWidth: 0,
+                  fontWeight: 600,
+                  color: 'var(--white)',
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                  whiteSpace: { xs: 'normal', sm: 'nowrap' },
+                  display: { xs: '-webkit-box', sm: 'block' },
+                  WebkitLineClamp: { xs: 2, sm: 'unset' },
+                  WebkitBoxOrient: { xs: 'vertical', sm: 'unset' },
+                  fontSize: { xs: '0.85rem', sm: '0.875rem' },
+                  lineHeight: { xs: 1.4, sm: 1.5 },
+                  wordBreak: 'break-word',
+                  outline: 'none',
+                  '&:focus-visible': {
+                    boxShadow: '0 0 0 3px rgba(255, 140, 66, 0.25)',
+                    borderRadius: 8,
+                  },
+                }}
+              >
+                {fileName}
+              </Typography>
+            </Tooltip>
+            {hasError && (
+              <Typography
+                variant="caption"
+                sx={{
+                  display: 'block',
+                  mt: 0.25,
+                  fontWeight: 800,
+                  color: 'error.main',
+                  fontSize: { xs: '0.75rem', sm: '0.8rem' },
+                }}
+              >
+                {error}
+              </Typography>
+            )}
+          </Box>
         </Box>
 
         {/* Delete button */}
@@ -468,6 +504,7 @@ const SortableFileItem = ({ file, index, totalFiles, onRemove, onMoveUp, onMoveD
 const PdfOperations = () => {
   const [file, setFile] = useState(null);
   const [mergeFiles, setMergeFiles] = useState([]);
+  const [mergeFileItemErrors, setMergeFileItemErrors] = useState({});
   const [operation, setOperation] = useState('merge');
   const [pageInput, setPageInput] = useState('');
   const [selectedPages, setSelectedPages] = useState([]); // Array of { id, display, pages }
@@ -496,6 +533,29 @@ const PdfOperations = () => {
   const abortRef = useRef(null);
   const fileInputRef = useRef(null);
   const mergeFileInputRef = useRef(null);
+  const resultPanelRef = useRef(null);
+  const mergeUploadAreaRef = useRef(null);
+  const singleUploadAreaRef = useRef(null);
+  const swapLeftInputRef = useRef(null);
+  const swapRightInputRef = useRef(null);
+
+  const scrollToElement = (el) => {
+    if (!el) return;
+    const rect = el.getBoundingClientRect();
+    const absoluteTop = rect.top + window.scrollY;
+    // Keep a little breathing room under the AppBar.
+    const headerOffset = 88;
+    const targetTop = Math.max(0, absoluteTop - headerOffset);
+    window.scrollTo({ top: targetTop, behavior: 'smooth' });
+  };
+
+  const scrollToId = (id) => {
+    if (!id) return;
+    const el = document.getElementById(id);
+    if (el) scrollToElement(el);
+  };
+
+  const scrollToResultPanel = () => scrollToElement(resultPanelRef.current);
 
   const selectedOperation = useMemo(() => operationDetails[operation] ?? operationDetails.merge, [operation]);
   const mergeCount = mergeFiles.length;
@@ -601,6 +661,7 @@ const PdfOperations = () => {
     setOperation(event.target.value);
     setFile(null);
     setMergeFiles([]);
+    setMergeFileItemErrors({});
     setSelectedPages([]);
     setSwapPages({ left: '', right: '' });
     setOutputName('');
@@ -729,6 +790,12 @@ const PdfOperations = () => {
 
   const removeMergeFile = (fileId) => {
     setMergeFiles((prev) => prev.filter((f) => f.id !== fileId));
+    setMergeFileItemErrors((prev) => {
+      if (!prev || !prev[fileId]) return prev;
+      const next = { ...prev };
+      delete next[fileId];
+      return next;
+    });
   };
 
   const removeSingleFile = () => {
@@ -740,6 +807,7 @@ const PdfOperations = () => {
     if (abortRef.current) abortRef.current.abort();
     setFile(null);
     setMergeFiles([]);
+    setMergeFileItemErrors({});
     setSelectedPages([]);
     setPageInput('');
     setSwapPages({ left: '', right: '' });
@@ -775,22 +843,27 @@ const PdfOperations = () => {
       mergeFiles: '',
       outputName: '',
     });
+    setMergeFileItemErrors({});
     
     // Validate before submitting
     let hasErrors = false;
+    let firstErrorTarget = null;
 
     if (operation === 'merge') {
       if (mergeFiles.length === 0) {
         setFieldErrors((prev) => ({ ...prev, mergeFiles: 'Please select at least two PDFs to merge' }));
         hasErrors = true;
+        firstErrorTarget = firstErrorTarget || mergeUploadAreaRef.current;
       } else if (mergeFiles.length === 1) {
         setFieldErrors((prev) => ({ ...prev, mergeFiles: 'Please select at least one more PDF to merge' }));
         hasErrors = true;
+        firstErrorTarget = firstErrorTarget || mergeUploadAreaRef.current;
       }
     } else {
       if (!file) {
         setFieldErrors((prev) => ({ ...prev, file: 'Please select a PDF file first' }));
         hasErrors = true;
+        firstErrorTarget = firstErrorTarget || singleUploadAreaRef.current;
       }
       
       if (operation === 'swap') {
@@ -801,27 +874,38 @@ const PdfOperations = () => {
         if (!left) {
           setFieldErrors((prev) => ({ ...prev, swapLeft: 'Please enter a page number' }));
           hasErrors = true;
+          firstErrorTarget = firstErrorTarget || swapLeftInputRef.current;
         } else if (!isValid(left)) {
           setFieldErrors((prev) => ({ ...prev, swapLeft: 'Must be a positive number' }));
           hasErrors = true;
+          firstErrorTarget = firstErrorTarget || swapLeftInputRef.current;
         }
         
         if (!right) {
           setFieldErrors((prev) => ({ ...prev, swapRight: 'Please enter a page number' }));
           hasErrors = true;
+          firstErrorTarget = firstErrorTarget || swapRightInputRef.current;
         } else if (!isValid(right)) {
           setFieldErrors((prev) => ({ ...prev, swapRight: 'Must be a positive number' }));
           hasErrors = true;
+          firstErrorTarget = firstErrorTarget || swapRightInputRef.current;
         }
         
         if (left && right && left === right) {
           setFieldErrors((prev) => ({ ...prev, swapRight: 'Must be different from Page A' }));
           hasErrors = true;
+          firstErrorTarget = firstErrorTarget || swapRightInputRef.current;
         }
       }
     }
 
-    if (hasErrors) return;
+    if (hasErrors) {
+      window.requestAnimationFrame(() => scrollToElement(firstErrorTarget));
+      return;
+    }
+
+    // No validation errors: scroll to Result for progress + output.
+    window.requestAnimationFrame(scrollToResultPanel);
 
     setIsSubmitting(true);
     setResult(null);
@@ -859,17 +943,70 @@ const PdfOperations = () => {
 
       const data = await response.json().catch(() => ({}));
       if (!response.ok) {
+        // Merge: keep errors inline and highlight the offending file instead of
+        // falling back to a global "page takeover" error UI.
+        if (operation === 'merge') {
+          const invalidIndexRaw = data?.invalid_index;
+          const invalidIndex = Number.isFinite(Number(invalidIndexRaw)) ? Number(invalidIndexRaw) : null;
+          const invalidFileName = typeof data?.invalid_file === 'string' ? data.invalid_file : null;
+
+          const target =
+            (invalidIndex !== null && mergeFiles[invalidIndex]) ||
+            (invalidFileName ? mergeFiles.find((f) => f?.file?.name === invalidFileName) : null);
+
+          if (target) {
+            setMergeFileItemErrors((prev) => ({
+              ...(prev || {}),
+              [target.id]: data.message || 'File is not a valid PDF.',
+            }));
+            window.requestAnimationFrame(() => scrollToId(mergeItemDomId(target.id)));
+            return;
+          }
+        }
+
+        // Swap: keep validation errors attached to the swap inputs.
+        if (operation === 'swap') {
+          const msg = String(data?.message || '');
+          if (msg.includes('Page selection exceeds PDF page count')) {
+            // Backend message includes the PDF page count: "... (N)."
+            // Highlight the actual offending input(s) (Page A and/or Page B).
+            const m = msg.match(/\((\d+)\)/);
+            const maxPages = m ? Number(m[1]) : null;
+            const leftN = Number(swapPages.left);
+            const rightN = Number(swapPages.right);
+
+            const leftInvalid = Number.isFinite(leftN) && leftN > 0 && maxPages !== null && Number.isFinite(maxPages) && leftN > maxPages;
+            const rightInvalid = Number.isFinite(rightN) && rightN > 0 && maxPages !== null && Number.isFinite(maxPages) && rightN > maxPages;
+
+            setFieldErrors((prev) => ({
+              ...prev,
+              swapLeft: leftInvalid ? msg : prev.swapLeft,
+              swapRight: rightInvalid ? msg : prev.swapRight,
+              // If we can't tell which side is invalid, attach to Page B as a fallback.
+              ...(leftInvalid || rightInvalid ? null : { swapRight: msg || 'Invalid page selection.' }),
+            }));
+            const targetEl = leftInvalid ? swapLeftInputRef.current : swapRightInputRef.current;
+            window.requestAnimationFrame(() => scrollToElement(targetEl));
+            return;
+          }
+        }
+
         throw new Error(data.message || 'Unable to process your PDF right now. Please try again.');
       }
 
       const jobId = data.job_id;
       if (!jobId) throw new Error('Something went wrong. Please try again.');
+      const downloadToken = data.download_token;
+      if (!downloadToken) throw new Error('Missing download token. Please try again.');
 
       const job = await pollJobUntilDone(jobId, controller.signal);
-      const downloadUrl = normalizeDownloadUrl(job.download_url || `/api/jobs/${jobId}/download`);
+      const baseDownloadUrl = normalizeDownloadUrl(job.download_url || `/api/jobs/${jobId}/download`);
+      const previewUrl = buildJobDownloadUrl({ baseUrl: baseDownloadUrl, token: downloadToken, consume: false });
+      const downloadUrl = buildJobDownloadUrl({ baseUrl: baseDownloadUrl, token: downloadToken, consume: true });
       const successMessage = 'Your PDF is ready.';
       const outputFileName = job.output_download_name || (outputName.trim() ? `${outputName.trim()}.pdf` : 'output.pdf');
-      setResult({ message: successMessage, downloadUrl, outputFileName, jobId });
+      setMergeFileItemErrors({});
+      setResult({ message: successMessage, downloadUrl, previewUrl, outputFileName, jobId, downloadToken });
     } catch (error) {
       setSnackbar({
         open: true,
@@ -942,8 +1079,8 @@ const PdfOperations = () => {
   };
 
   const handlePreviewResult = () => {
-    if (result?.downloadUrl) {
-      setPreviewFile(result.downloadUrl);
+    if (result?.previewUrl) {
+      setPreviewFile(result.previewUrl);
       setPreviewFileName(result.outputFileName || 'output.pdf');
     }
   };
@@ -1118,6 +1255,7 @@ const PdfOperations = () => {
                     {operation === 'merge' ? (
                       <>
                         <Box
+                          ref={mergeUploadAreaRef}
                           sx={{
                             border: fieldErrors.mergeFiles ? '2px solid #ff4444' : '2px solid transparent',
                             borderRadius: 2,
@@ -1173,6 +1311,7 @@ const PdfOperations = () => {
                                       <SortableFileItem
                                         key={fileObj.id}
                                         file={fileObj}
+                                        error={mergeFileItemErrors[fileObj.id]}
                                         index={index}
                                         totalFiles={mergeFiles.length}
                                         onRemove={() => removeMergeFile(fileObj.id)}
@@ -1210,6 +1349,7 @@ const PdfOperations = () => {
                     ) : (
                       <>
                         <Box
+                          ref={singleUploadAreaRef}
                           sx={{
                             border: fieldErrors.file ? '2px solid #ff4444' : '2px solid transparent',
                             borderRadius: 2,
@@ -1387,9 +1527,24 @@ const PdfOperations = () => {
                                 setFieldErrors((prev) => ({ ...prev, swapLeft: '' }));
                               }
                             }}
+                            inputRef={swapLeftInputRef}
                             inputProps={{ inputMode: 'numeric', pattern: '[0-9]*' }}
                             error={Boolean(fieldErrors.swapLeft)}
                             helperText={fieldErrors.swapLeft || 'First page number'}
+                            sx={{
+                              animation: fieldErrors.swapLeft ? 'error-pulse 0.4s ease-out' : 'none',
+                              '& .MuiOutlinedInput-root': {
+                                ...(fieldErrors.swapLeft
+                                  ? {
+                                      '& .MuiOutlinedInput-notchedOutline': {
+                                        borderColor: '#ff4444 !important',
+                                        borderWidth: '2px',
+                                      },
+                                      boxShadow: '0 0 0 4px rgba(255, 68, 68, 0.15)',
+                                    }
+                                  : null),
+                              },
+                            }}
                           />
                         </Grid>
                         <Grid item xs={12} sm={6}>
@@ -1403,9 +1558,24 @@ const PdfOperations = () => {
                                 setFieldErrors((prev) => ({ ...prev, swapRight: '' }));
                               }
                             }}
+                            inputRef={swapRightInputRef}
                             inputProps={{ inputMode: 'numeric', pattern: '[0-9]*' }}
                             error={Boolean(fieldErrors.swapRight)}
                             helperText={fieldErrors.swapRight || 'Second page number'}
+                            sx={{
+                              animation: fieldErrors.swapRight ? 'error-pulse 0.4s ease-out' : 'none',
+                              '& .MuiOutlinedInput-root': {
+                                ...(fieldErrors.swapRight
+                                  ? {
+                                      '& .MuiOutlinedInput-notchedOutline': {
+                                        borderColor: '#ff4444 !important',
+                                        borderWidth: '2px',
+                                      },
+                                      boxShadow: '0 0 0 4px rgba(255, 68, 68, 0.15)',
+                                    }
+                                  : null),
+                              },
+                            }}
                           />
                         </Grid>
                       </Grid>
@@ -1485,7 +1655,11 @@ const PdfOperations = () => {
             </Box>
 
             <Box sx={{ flex: { xs: '1 1 auto', md: '1 1 0' }, minWidth: 0, width: '100%' }}>
-              <Paper elevation={4} className={`panel result-panel${isSubmitting ? ' result-panel--loading' : ''}${!isSubmitting && result ? ' result-panel--ready' : ''}`}>
+              <Paper
+                ref={resultPanelRef}
+                elevation={4}
+                className={`panel result-panel${isSubmitting ? ' result-panel--loading' : ''}${!isSubmitting && result ? ' result-panel--ready' : ''}`}
+              >
                 <Stack spacing={{ xs: 1.5, sm: 2.25 }} sx={{ p: { xs: 2, sm: 2.5, md: 3 } }}>
                   <Box>
                     <Typography 
@@ -1538,7 +1712,7 @@ const PdfOperations = () => {
                     )}
                       
                       {/* Output PDF Preview Thumbnail */}
-                      {result.downloadUrl && (
+                      {result.previewUrl && (
                         <Box
                           sx={{
                             display: 'flex',
@@ -1550,7 +1724,7 @@ const PdfOperations = () => {
                           }}
                         >
                           <PdfThumbnail
-                            file={result.downloadUrl}
+                            file={result.previewUrl}
                             onExpand={handlePreviewResult}
                             width={window.innerWidth < 600 ? 120 : 160}
                             showPageCount={true}
@@ -1752,15 +1926,6 @@ const PdfOperations = () => {
         />
 
         {/* User feedback messages */}
-        <Backdrop
-          open={snackbar.open && snackbar.severity === 'error'}
-          onClick={handleClose}
-          sx={{
-            zIndex: 1390,
-            bgcolor: 'rgba(0,0,0,0.35)',
-            backdropFilter: 'blur(2px)',
-          }}
-        />
         <Snackbar
           open={snackbar.open}
           autoHideDuration={snackbar.severity === 'info' ? 4000 : 6500}

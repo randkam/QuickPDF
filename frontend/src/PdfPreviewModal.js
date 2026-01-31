@@ -20,6 +20,7 @@ import ZoomOutIcon from '@mui/icons-material/ZoomOut';
 import FitScreenIcon from '@mui/icons-material/FitScreen';
 import 'react-pdf/dist/esm/Page/AnnotationLayer.css';
 import 'react-pdf/dist/esm/Page/TextLayer.css';
+import PdfErrorBoundary from './PdfErrorBoundary';
 
 // Configure PDF.js worker with local file
 pdfjs.GlobalWorkerOptions.workerSrc = `${process.env.PUBLIC_URL}/pdf.worker.js`;
@@ -517,22 +518,36 @@ const PdfPreviewModal = ({ open, onClose, file, fileName = 'PDF Preview' }) => {
               },
             }}
           >
-            <Document
-              file={pdfUrl}
-              onLoadSuccess={onDocumentLoadSuccess}
-              onLoadError={onDocumentLoadError}
-              loading=""
-              error=""
+            <PdfErrorBoundary
+              resetKey={`${pdfUrl || ''}:${currentPage}:${scale}`}
+              fallback={
+                <Box sx={{ textAlign: 'center', maxWidth: 520, p: 2 }}>
+                  <Typography variant="h6" color="error.main" gutterBottom>
+                    Preview Error
+                  </Typography>
+                  <Typography variant="body2" color="text.secondary">
+                    This PDF couldn’t be previewed in the browser. You can still download it.
+                  </Typography>
+                </Box>
+              }
             >
-              <Page
-                pageNumber={currentPage}
-                scale={scale}
-                renderTextLayer={true}
-                renderAnnotationLayer={true}
+              <Document
+                file={pdfUrl}
+                onLoadSuccess={onDocumentLoadSuccess}
+                onLoadError={onDocumentLoadError}
                 loading=""
                 error=""
-              />
-            </Document>
+              >
+                <Page
+                  pageNumber={currentPage}
+                  scale={scale}
+                  renderTextLayer={true}
+                  renderAnnotationLayer={true}
+                  loading=""
+                  error=""
+                />
+              </Document>
+            </PdfErrorBoundary>
           </Box>
         )}
       </DialogContent>
