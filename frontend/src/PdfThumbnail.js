@@ -4,6 +4,7 @@ import { Box, CircularProgress, Typography } from '@mui/material';
 import ZoomInIcon from '@mui/icons-material/ZoomIn';
 import 'react-pdf/dist/esm/Page/AnnotationLayer.css';
 import 'react-pdf/dist/esm/Page/TextLayer.css';
+import PdfErrorBoundary from './PdfErrorBoundary';
 
 // Configure PDF.js worker with local file
 pdfjs.GlobalWorkerOptions.workerSrc = `${process.env.PUBLIC_URL}/pdf.worker.js`;
@@ -26,6 +27,9 @@ const PdfThumbnail = ({ file, onExpand, width = 80, showPageCount = true }) => {
   // Create and cleanup blob URL + manage mounted state
   useEffect(() => {
     isMountedRef.current = true;  // Reset on mount/file change
+    setLoading(true);
+    setError(null);
+    setNumPages(null);
     
     if (file instanceof File) {
       const url = URL.createObjectURL(file);
@@ -111,22 +115,39 @@ const PdfThumbnail = ({ file, onExpand, width = 80, showPageCount = true }) => {
       )}
 
       {!error && (
-        <Document
-          file={pdfUrl}
-          onLoadSuccess={onDocumentLoadSuccess}
-          onLoadError={onDocumentLoadError}
-          loading=""
-          error=""
+        <PdfErrorBoundary
+          resetKey={pdfUrl}
+          fallback={
+            <Typography
+              variant="caption"
+              sx={{
+                color: 'error.main',
+                textAlign: 'center',
+                padding: 1,
+                fontSize: '0.65rem',
+              }}
+            >
+              Preview unavailable
+            </Typography>
+          }
         >
-          <Page
-            pageNumber={1}
-            width={width}
-            renderTextLayer={false}
-            renderAnnotationLayer={false}
+          <Document
+            file={pdfUrl}
+            onLoadSuccess={onDocumentLoadSuccess}
+            onLoadError={onDocumentLoadError}
             loading=""
             error=""
-          />
-        </Document>
+          >
+            <Page
+              pageNumber={1}
+              width={width}
+              renderTextLayer={false}
+              renderAnnotationLayer={false}
+              loading=""
+              error=""
+            />
+          </Document>
+        </PdfErrorBoundary>
       )}
 
       {/* Page count badge */}

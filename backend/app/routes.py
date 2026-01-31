@@ -1,6 +1,10 @@
 import os
 import re
+import time
 import uuid
+import hashlib
+import hmac
+import secrets
 from pathlib import Path
 
 from flask import Blueprint, current_app, jsonify, request, send_from_directory, url_for
@@ -8,7 +12,7 @@ from werkzeug.utils import secure_filename
 from PyPDF2 import PdfReader
 
 from .config import Config
-from .jobs_store import create_job_record, enqueue_job, get_job_paths, read_json
+from .jobs_store import atomic_write_json, create_job_record, enqueue_job, get_job_paths, read_json
 from .queue import get_queue
 from .rate_limit import RateLimit, rate_limited
 
@@ -18,6 +22,66 @@ main = Blueprint("main", __name__)
 def allowed_file(filename: str) -> bool:
     allowed = current_app.config.get("ALLOWED_EXTENSIONS", Config.ALLOWED_EXTENSIONS)
     return "." in filename and filename.rsplit(".", 1)[1].lower() in allowed
+
+
+def _sha256_hex(value: str) -> str:
+    return hashlib.sha256(value.encode("utf-8")).hexdigest()
+
+
+def _job_ttl_s() -> int:
+    ttl = current_app.config.get("JOB_TTL_S", getattr(Config, "JOB_TTL_S", 3600))
+    try:
+        ttl_i = int(ttl)
+    except Exception:
+        ttl_i = 3600
+    return max(60, ttl_i)  # never less than 60s
+
+
+def _delete_output_after_download() -> bool:
+    return bool(current_app.config.get("DELETE_OUTPUT_AFTER_DOWNLOAD", getattr(Config, "DELETE_OUTPUT_AFTER_DOWNLOAD", True)))
+
+
+def _job_is_expired(job: dict) -> bool:
+    created_at = job.get("created_at")
+    try:
+        created_ts = float(created_at)
+    except Exception:
+        return False
+    return (time.time() - created_ts) > _job_ttl_s()
+
+
+def _cleanup_job_artifacts(*, job_file: Path, job: dict) -> None:
+    # Best-effort removal of output file + job record.
+    try:
+        upload_dir = Path(current_app.config["UPLOAD_FOLDER"])
+        output_filename = str(job.get("output_filename") or "").strip()
+        if output_filename:
+            out_path = upload_dir / output_filename
+            try:
+                out_path.unlink(missing_ok=True)
+            except Exception:
+                pass
+    except Exception:
+        pass
+
+    try:
+        job_file.unlink(missing_ok=True)
+    except Exception:
+        pass
+
+
+def _load_job_or_404(job_id: str):
+    paths = get_job_paths()
+    job_file = paths.job_file(job_id)
+    if not job_file.is_file():
+        return None, job_file, (jsonify({"message": "Job not found."}), 404)
+
+    job = read_json(job_file)
+    if _job_is_expired(job):
+        _cleanup_job_artifacts(job_file=job_file, job=job)
+        return None, job_file, (jsonify({"message": "Job expired."}), 404)
+
+    return job, job_file, None
 
 
 def _clean_pages(pages_raw: str | None) -> list[str]:
@@ -110,15 +174,19 @@ def _ensure_real_pdf_and_count_pages(upload) -> int:
     Validate that the upload looks like a real PDF and return page count.
     This is intentionally lightweight and defensive; the worker also re-validates.
     """
-    # Magic header check (don't trust filename extension)
+    # Magic header check (don't trust filename extension).
+    #
+    # Important: some real PDFs can have leading bytes (e.g. BOM, whitespace, or
+    # other non-PDF preamble). Per PDF spec, the header should appear within the
+    # first 1024 bytes, so we scan a small prefix rather than requiring byte 0.
     try:
         upload.stream.seek(0)
-        header = upload.stream.read(5)
+        prefix = upload.stream.read(1024)
         upload.stream.seek(0)
     except Exception as exc:  # noqa: BLE001
         raise ValueError("Unreadable upload stream.") from exc
 
-    if header != b"%PDF-":
+    if not prefix or b"%PDF-" not in prefix:
         raise ValueError("File is not a valid PDF.")
 
     try:
@@ -201,9 +269,10 @@ def create_job():
             return jsonify({"message": f"Too many files (max {max_merge_files})."}), 400
 
         total_pages = 0
-        for upload in merge_files:
-            if not upload or upload.filename == "":
-                continue
+        # Only consider non-empty uploads, and keep a stable index so the UI can
+        # highlight a specific file on validation errors.
+        effective_merge_files = [f for f in merge_files if f and f.filename != ""]
+        for upload_index, upload in enumerate(effective_merge_files):
 
             try:
                 pages_in_file = _ensure_real_pdf_and_count_pages(upload)
@@ -213,7 +282,16 @@ def create_job():
                         p.unlink(missing_ok=True)
                     except Exception:
                         pass
-                return jsonify({"message": str(exc)}), 400
+                return (
+                    jsonify(
+                        {
+                            "message": str(exc),
+                            "invalid_file": upload.filename,
+                            "invalid_index": upload_index,
+                        }
+                    ),
+                    400,
+                )
 
             if pages_in_file > max_pdf_pages:
                 for p in saved_paths:
@@ -274,6 +352,10 @@ def create_job():
 
     job_id = uuid.uuid4().hex
 
+    # One-time download token (returned only once, not stored in plaintext).
+    download_token = secrets.token_urlsafe(32)
+    download_token_hash = _sha256_hex(download_token)
+
     # On-disk output name (unique; avoids collisions)
     output_filename = f"{job_id}_{output_download_name}"
 
@@ -284,6 +366,7 @@ def create_job():
         output_filename=output_filename,
         output_download_name=output_download_name,
         pages=pages,
+        download_token_hash=download_token_hash,
     )
     enqueue_job(job)
 
@@ -306,7 +389,7 @@ def create_job():
             pass
         return jsonify({"message": "Queue unavailable. Try again later."}), 503
 
-    return jsonify({"job_id": job_id}), 202
+    return jsonify({"job_id": job_id, "download_token": download_token}), 202
 
 
 @main.route("/jobs/<job_id>", methods=["GET"])
@@ -316,16 +399,16 @@ def create_job():
     window_s=int(current_app.config.get("RATE_LIMIT_WINDOW_S", Config.RATE_LIMIT_WINDOW_S)),
 ))
 def get_job(job_id: str):
-    paths = get_job_paths()
-    job_file = paths.job_file(job_id)
-    if not job_file.is_file():
-        return jsonify({"message": "Job not found."}), 404
-
-    job = read_json(job_file)
+    job, _job_file, err = _load_job_or_404(job_id)
+    if err:
+        return err
+    assert job is not None
     status = str(job.get("status") or "").strip()
     if status == "done":
         # Return a relative path so it always works behind proxies (nginx on :8080, etc).
         job["download_url"] = url_for("main.download_job_result", job_id=job_id, _external=False)
+    # Never return token/hash to callers.
+    job.pop("download_token_hash", None)
     return jsonify(job)
 
 
@@ -336,12 +419,19 @@ def get_job(job_id: str):
     window_s=int(current_app.config.get("RATE_LIMIT_WINDOW_S", Config.RATE_LIMIT_WINDOW_S)),
 ))
 def download_job_result(job_id: str):
-    paths = get_job_paths()
-    job_file = paths.job_file(job_id)
-    if not job_file.is_file():
-        return jsonify({"message": "Job not found."}), 404
+    job, job_file, err = _load_job_or_404(job_id)
+    if err:
+        return err
+    assert job is not None
 
-    job = read_json(job_file)
+    # Require download token (query param or header).
+    token = (request.args.get("token") or "").strip() or (request.headers.get("X-Download-Token") or "").strip()
+    if not token:
+        return jsonify({"message": "Missing download token."}), 403
+    expected_hash = str(job.get("download_token_hash") or "").strip()
+    if not expected_hash or not hmac.compare_digest(_sha256_hex(token), expected_hash):
+        return jsonify({"message": "Invalid download token."}), 403
+
     status = str(job.get("status") or "").strip()
     if status != "done":
         return jsonify({"message": "Job is not complete yet."}), 409
@@ -356,6 +446,18 @@ def download_job_result(job_id: str):
     if not os.path.isfile(file_path):
         return jsonify({"message": "Output file not found."}), 404
 
+    # Some clients (like react-pdf) will issue multiple requests (range/metadata)
+    # for previewing. We support a "consume" flag for the user-initiated download
+    # action; previews should omit it.
+    # Multi-download support:
+    # - Valid token can download multiple times until TTL expiry.
+    # - We keep best-effort stats only (no one-time consumption).
+    downloads = int(job.get("downloads") or 0)
+    job["downloads"] = downloads + 1
+    job["downloaded_at"] = time.time()
+    job["updated_at"] = time.time()
+    atomic_write_json(job_file, job)
+
     return send_from_directory(upload_dir, output_filename, as_attachment=True, download_name=download_name)
 
 
@@ -364,14 +466,5 @@ def upload_file():
     # Legacy endpoint: kept to avoid confusing 404s, but no longer supported since the worker
     # is now an RQ worker (not an HTTP processing service).
     return jsonify({"message": "This endpoint is deprecated. Use POST /api/jobs instead."}), 410
-
-
-@main.route("/download/<path:filename>", methods=["GET"])
-def download_file(filename: str):
-    upload_dir = current_app.config["UPLOAD_FOLDER"]
-    file_path = os.path.join(upload_dir, filename)
-    if not os.path.isfile(file_path):
-        return jsonify({"message": "File not found."}), 404
-    return send_from_directory(upload_dir, filename, as_attachment=True)
 
 

@@ -45,6 +45,7 @@ def create_job_record(
     output_filename: str,
     output_download_name: str,
     pages: list[str] | None,
+    download_token_hash: str,
 ) -> dict[str, Any]:
     ts = _now_ts()
     job: dict[str, Any] = {
@@ -56,6 +57,9 @@ def create_job_record(
         "output_download_name": output_download_name,
         "pages": pages or [],
         "error_message": None,
+        "download_token_hash": download_token_hash,
+        "downloads": 0,
+        "downloaded_at": None,
         "created_at": ts,
         "updated_at": ts,
     }
