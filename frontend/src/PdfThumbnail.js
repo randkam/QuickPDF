@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Document, Page, pdfjs } from 'react-pdf';
 import { Box, CircularProgress, Typography } from '@mui/material';
 import ZoomInIcon from '@mui/icons-material/ZoomIn';
@@ -20,21 +20,47 @@ const PdfThumbnail = ({ file, onExpand, width = 80, showPageCount = true }) => {
   const [numPages, setNumPages] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [pdfUrl, setPdfUrl] = useState(null);
+  const isMountedRef = useRef(true);
+
+  // Create and cleanup blob URL + manage mounted state
+  useEffect(() => {
+    isMountedRef.current = true;  // Reset on mount/file change
+    
+    if (file instanceof File) {
+      const url = URL.createObjectURL(file);
+      setPdfUrl(url);
+      return () => {
+        URL.revokeObjectURL(url);
+        isMountedRef.current = false;
+      };
+    } else {
+      setPdfUrl(file);
+      return () => {
+        isMountedRef.current = false;
+      };
+    }
+  }, [file]);
 
   const onDocumentLoadSuccess = ({ numPages: pages }) => {
+    if (!isMountedRef.current) {
+      console.warn('[PdfThumbnail] Component unmounted, skipping state update');
+      return;
+    }
     setNumPages(pages);
     setLoading(false);
     setError(null);
   };
 
   const onDocumentLoadError = (err) => {
-    console.error('PDF load error:', err);
+    if (!isMountedRef.current) {
+      console.warn('[PdfThumbnail] Component unmounted, skipping error state update');
+      return;
+    }
+    console.error('[PdfThumbnail] PDF load error:', err);
     setError('Failed to load PDF');
     setLoading(false);
   };
-
-  // Convert File object to URL if needed
-  const pdfUrl = file instanceof File ? URL.createObjectURL(file) : file;
 
   return (
     <Box
