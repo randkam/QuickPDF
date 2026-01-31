@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Document, Page, pdfjs } from 'react-pdf';
 import {
   Dialog,
@@ -39,25 +39,70 @@ const PdfPreviewModal = ({ open, onClose, file, fileName = 'PDF Preview' }) => {
   const [scale, setScale] = useState(1.0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [pdfUrl, setPdfUrl] = useState(null);
+  const isMountedRef = useRef(true);
+
+  // Create and cleanup blob URL
+  useEffect(() => {
+    if (file instanceof File) {
+      const url = URL.createObjectURL(file);
+      console.log('[PdfPreviewModal] Created blob URL for File:', { fileName, url });
+      setPdfUrl(url);
+      return () => {
+        console.log('[PdfPreviewModal] Revoking blob URL:', { fileName, url });
+        URL.revokeObjectURL(url);
+      };
+    } else {
+      console.log('[PdfPreviewModal] Using direct URL:', { fileName, url: file });
+      setPdfUrl(file);
+    }
+  }, [file, fileName]);
 
   // Reset state when modal opens with new file
-  React.useEffect(() => {
+  useEffect(() => {
+    let timeoutId;
+    
     if (open && file) {
+      console.log('[PdfPreviewModal] Modal opening with file:', { 
+        fileName, 
+        isFile: file instanceof File,
+        isMountedBefore: isMountedRef.current 
+      });
+      
+      isMountedRef.current = true;  // Reset mounted flag when modal opens
       setCurrentPage(1);
       setPageInputValue('1');
       setScale(1.0);
       setLoading(true);
       setError(null);
+      setNumPages(null);
+      
+      // Safety timeout: if PDF doesn't load in 30 seconds, show error
+      timeoutId = setTimeout(() => {
+        if (isMountedRef.current) {
+          console.error('[PdfPreviewModal] Load timeout after 30s');
+          setError('Preview load timeout - PDF may be too large or corrupted');
+          setLoading(false);
+        }
+      }, 30000);
+    } else if (!open && isMountedRef.current) {
+      // Mark as unmounted when modal closes
+      console.log('[PdfPreviewModal] Modal closing, marking as unmounted');
+      isMountedRef.current = false;
     }
-  }, [open, file]);
+    
+    return () => {
+      if (timeoutId) clearTimeout(timeoutId);
+    };
+  }, [open, file, fileName]);
 
   // Update input value when page changes
-  React.useEffect(() => {
+  useEffect(() => {
     setPageInputValue(String(currentPage));
   }, [currentPage]);
 
   // Keyboard navigation
-  React.useEffect(() => {
+  useEffect(() => {
     if (!open || !numPages) return;
 
     const handleKeyDown = (e) => {
@@ -93,14 +138,36 @@ const PdfPreviewModal = ({ open, onClose, file, fileName = 'PDF Preview' }) => {
   }, [open, numPages]);
 
   const onDocumentLoadSuccess = ({ numPages: pages }) => {
+    console.log('[PdfPreviewModal] Document loaded successfully:', { 
+      fileName, 
+      numPages: pages, 
+      isMounted: isMountedRef.current 
+    });
+    
+    if (!isMountedRef.current) {
+      console.warn('[PdfPreviewModal] Component unmounted, skipping state update');
+      return;
+    }
+    
     setNumPages(pages);
     setLoading(false);
     setError(null);
   };
 
   const onDocumentLoadError = (err) => {
-    console.error('PDF load error:', err);
-    setError('Failed to load PDF preview');
+    console.error('[PdfPreviewModal] Document load error:', {
+      fileName,
+      error: err,
+      message: err?.message,
+      isMounted: isMountedRef.current
+    });
+    
+    if (!isMountedRef.current) {
+      console.warn('[PdfPreviewModal] Component unmounted, skipping error state update');
+      return;
+    }
+    
+    setError(`Failed to load PDF: ${err?.message || 'Unknown error'}`);
     setLoading(false);
   };
 
@@ -145,9 +212,6 @@ const PdfPreviewModal = ({ open, onClose, file, fileName = 'PDF Preview' }) => {
   const resetZoom = () => {
     setScale(1.0);
   };
-
-  // Convert File object to URL if needed
-  const pdfUrl = file instanceof File ? URL.createObjectURL(file) : file;
 
   return (
     <Dialog
