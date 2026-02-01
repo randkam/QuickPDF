@@ -3,8 +3,8 @@ import App from './App';
 
 test('renders QuickPDF header', () => {
   render(<App />);
-  const header = screen.getByText(/QuickPDF/i);
-  expect(header).toBeInTheDocument();
+  const logo = screen.getByAltText(/QuickPDF/i);
+  expect(logo).toBeInTheDocument();
 });
 
 

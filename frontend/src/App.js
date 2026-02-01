@@ -62,6 +62,7 @@ import { CSS } from '@dnd-kit/utilities';
 import './App.css';
 import PdfThumbnail from './PdfThumbnail';
 import PdfPreviewModal from './PdfPreviewModal';
+import quickPdfLogo from './quickpdf-logo.png';
 
 // Sunny & Warm palette theme
 // #4E598C - Dusk Blue (base)
@@ -1092,10 +1093,18 @@ const PdfOperations = () => {
       <Box className="app-shell">
         <AppBar position="static" elevation={0} className="app-bar">
           <Toolbar sx={{ minHeight: { xs: 56, sm: 64 } }}>
-            <PictureAsPdfIcon sx={{ mr: { xs: 0.5, sm: 1 }, fontSize: { xs: 24, sm: 28 } }} />
-            <Typography variant="h6" sx={{ flexGrow: 1, fontWeight: 700, fontSize: { xs: '1rem', sm: '1.25rem' } }}>
-              QuickPDF
-            </Typography>
+            <Box sx={{ flexGrow: 1, display: 'flex', alignItems: 'center' }}>
+              <Box
+                component="img"
+                src={quickPdfLogo}
+                alt="QuickPDF"
+                sx={{
+                  height: { xs: 28, sm: 34 },
+                  width: 'auto',
+                  display: 'block',
+                }}
+              />
+            </Box>
             <Button
               color="inherit"
               startIcon={<FeedbackOutlinedIcon sx={{ display: { xs: 'none', sm: 'block' } }} />}
