@@ -1945,9 +1945,13 @@ const PdfOperations = () => {
             mt: { xs: '64px', sm: '72px' },
             '& .MuiSnackbarContent-root': { width: '100%' },
             zIndex: 1400,
+            // On small screens, MUI still applies `translateX(-50%)` for `horizontal: 'center'`.
+            // If we also set `left/right`, the snackbar can render off-screen. Instead, we
+            // pin it to the viewport with explicit left/right and remove the transform.
             width: { xs: 'calc(100% - 16px)', sm: 'auto' },
-            left: { xs: '8px', sm: 'auto' },
-            right: { xs: '8px', sm: 'auto' },
+            left: { xs: 8, sm: '50%' },
+            right: { xs: 8, sm: 'auto' },
+            transform: { xs: 'none', sm: 'translateX(-50%)' },
           }}
         >
           <Box sx={{ position: 'relative', display: 'inline-block', width: '100%' }}>

@@ -37,7 +37,8 @@ const PdfPreviewModal = ({ open, onClose, file, fileName = 'PDF Preview' }) => {
   const [numPages, setNumPages] = useState(null);
   const [currentPage, setCurrentPage] = useState(1);
   const [pageInputValue, setPageInputValue] = useState('1');
-  const [scale, setScale] = useState(1.0);
+  // Default to slightly zoomed out so most PDFs fit comfortably on first open.
+  const [scale, setScale] = useState(0.75);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [pdfUrl, setPdfUrl] = useState(null);
@@ -73,7 +74,7 @@ const PdfPreviewModal = ({ open, onClose, file, fileName = 'PDF Preview' }) => {
       isMountedRef.current = true;  // Reset mounted flag when modal opens
       setCurrentPage(1);
       setPageInputValue('1');
-      setScale(1.0);
+      setScale(0.75);
       setLoading(true);
       setError(null);
       setNumPages(null);
@@ -211,7 +212,7 @@ const PdfPreviewModal = ({ open, onClose, file, fileName = 'PDF Preview' }) => {
   };
 
   const resetZoom = () => {
-    setScale(1.0);
+    setScale(0.75);
   };
 
   return (

@@ -8,8 +8,12 @@
     <style>
       body {
         margin: 0;
-        font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-        background: #4E598C;
+        font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+        background:
+          radial-gradient(ellipse at 20% 0%, rgba(255, 140, 66, 0.18), transparent 55%),
+          radial-gradient(ellipse at 80% 10%, rgba(252, 175, 88, 0.12), transparent 45%),
+          radial-gradient(ellipse at 50% 100%, rgba(249, 199, 132, 0.1), transparent 50%),
+          linear-gradient(165deg, #4E598C 0%, #5A6699 25%, #4E598C 50%, #424D7A 75%, #4E598C 100%);
         color: #fff;
         display: grid;
         place-items: center;
@@ -20,25 +24,73 @@
         max-width: 520px;
         width: 100%;
         background: rgba(10, 12, 20, 0.92);
-        border: 1px solid rgba(255, 255, 255, 0.14);
-        border-radius: 14px;
+        border: 1px solid rgba(255, 140, 66, 0.25);
+        border-radius: 18px;
         padding: 22px;
         box-shadow: 0 24px 70px rgba(0, 0, 0, 0.55);
+        backdrop-filter: blur(12px) saturate(140%);
+      }
+      .top-accent {
+        height: 2px;
+        width: 100%;
+        background: linear-gradient(90deg, transparent, #FF8C42, #FCAF58, #F9C784, transparent);
+        border-radius: 999px;
+        margin-bottom: 14px;
+      }
+      .title {
+        margin: 0 0 8px 0;
+        font-weight: 900;
+        letter-spacing: -0.02em;
+      }
+      .subtitle {
+        margin: 0 0 18px 0;
+        opacity: 0.92;
+        line-height: 1.55;
+      }
+      .actions {
+        display: flex;
+        gap: 12px;
+        flex-wrap: wrap;
+        align-items: center;
       }
       a {
         color: #ff8c42;
+        text-decoration: none;
+        font-weight: 800;
+      }
+      a:hover {
+        text-decoration: underline;
+      }
+      .button {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        padding: 10px 14px;
+        border-radius: 12px;
+        border: 1px solid rgba(255, 255, 255, 0.16);
+        background: rgba(255, 140, 66, 0.12);
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
+      }
+      .button:hover {
+        background: rgba(255, 140, 66, 0.18);
+      }
+      .muted {
+        opacity: 0.85;
+        font-size: 0.95rem;
       }
     </style>
   </head>
   <body>
     <div class="card">
-      <h1 style="margin: 0 0 8px 0">Thanks!</h1>
-      <p style="margin: 0 0 16px 0; opacity: 0.9">
-        Your feedback was submitted successfully.
+      <div class="top-accent"></div>
+      <h1 class="title">Feedback received</h1>
+      <p class="subtitle">
+        Thanks for helping improve QuickPDF. Your message was sent successfully.
       </p>
-      <p style="margin: 0">
-        <a href="/">Back to QuickPDF</a>
-      </p>
+      <div class="actions">
+        <a class="button" href="/">Back to QuickPDF</a>
+        <span class="muted">You can close this tab.</span>
+      </div>
     </div>
   </body>
 </html>
