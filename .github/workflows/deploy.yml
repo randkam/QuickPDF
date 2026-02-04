@@ -74,12 +74,12 @@ jobs:
             
             echo "⚙️  Creating .env file with secrets..."
             cat > .env << 'EOF'
-SECRET_KEY=${{ secrets.SECRET_KEY }}
-CORS_ORIGINS=${{ secrets.CORS_ORIGINS }}
-MAX_CONTENT_LENGTH=52428800
-RQ_JOB_TIMEOUT_S=180
-CLEANUP_INPUTS=1
-EOF
+          SECRET_KEY=${{ secrets.SECRET_KEY }}
+          CORS_ORIGINS=${{ secrets.CORS_ORIGINS }}
+          MAX_CONTENT_LENGTH=52428800
+          RQ_JOB_TIMEOUT_S=180
+          CLEANUP_INPUTS=1
+          EOF
             
             echo "🛑 Stopping existing containers..."
             docker compose -f docker-compose.prod.yml down
