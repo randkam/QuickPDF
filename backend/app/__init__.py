@@ -44,6 +44,7 @@ def create_app() -> Flask:
         origins = sorted({o for o in normalized if o})
         if not origins:
             raise RuntimeError("CORS_ORIGINS was set but contained no valid origins.")
+        app.logger.info("CORS enabled for /api/* origins: %s", ", ".join(origins))
         CORS(
             app,
             resources={r"^/api/.*": {"origins": origins}},
